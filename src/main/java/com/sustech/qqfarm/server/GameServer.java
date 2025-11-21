@@ -15,7 +15,6 @@ public class GameServer {
     public static void main(String[] args) {
         System.out.println("Starting QQ Farm Server on port " + PORT);
 
-        // 1. Background Timer for Crop Growth
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
         scheduler.scheduleAtFixedRate(() -> {
             List<String> updatedOwners = FarmManager.getInstance().updateGrowthStates();
@@ -30,7 +29,6 @@ public class GameServer {
             }
         }, 1, 1, TimeUnit.SECONDS);
 
-        // 2. Accept Connections
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             ExecutorService pool = Executors.newCachedThreadPool();
             while (true) {
@@ -90,7 +88,7 @@ class ClientHandler implements Runnable {
         } finally {
             if (currentUser != null) {
                 GameServer.onlineClients.remove(currentUser);
-                FarmManager.getInstance().removePlayer(currentUser); // Mark as offline (Away)
+                FarmManager.getInstance().removePlayer(currentUser);
             }
             try { socket.close(); } catch (IOException ignored) {}
         }
@@ -106,7 +104,6 @@ class ClientHandler implements Runnable {
                 currentUser = (String) req.getData();
                 GameServer.onlineClients.put(currentUser, out);
                 fm.getOrCreateFarm(currentUser);
-                // When logging in, user is viewing their own farm
                 fm.updatePlayerView(currentUser, currentUser);
 
                 res.setMessage("Logged in as " + currentUser);
@@ -115,8 +112,6 @@ class ClientHandler implements Runnable {
 
             case GET_FARM:
                 String target = req.getTargetUser() != null ? req.getTargetUser() : currentUser;
-
-                // Update tracking: Current User is now looking at Target's farm
                 fm.updatePlayerView(currentUser, target);
 
                 Farm f = fm.getFarm(target);
@@ -130,11 +125,18 @@ class ClientHandler implements Runnable {
 
             case PLANT:
                 int pIdx = (Integer) req.getData();
-                boolean pOk = fm.plant(currentUser, pIdx);
-                res.setSuccess(pOk);
-                res.setMessage(pOk ? "Planted successfully" : "Failed to plant");
+                // FIX: Handle String return for specific error
+                String pResult = fm.plant(currentUser, pIdx);
+
+                if ("SUCCESS".equals(pResult)) {
+                    res.setSuccess(true);
+                    res.setMessage("Planted successfully");
+                    broadcastUpdate(currentUser);
+                } else {
+                    res.setSuccess(false);
+                    res.setMessage(pResult); // "Not enough coins..."
+                }
                 res.setData(fm.getFarm(currentUser));
-                if (pOk) broadcastUpdate(currentUser);
                 break;
 
             case HARVEST:
@@ -148,7 +150,7 @@ class ClientHandler implements Runnable {
 
             case STEAL:
                 String victim = req.getTargetUser();
-                int sIdx = (Integer) req.getData(); // Get specific plot index
+                int sIdx = (Integer) req.getData();
 
                 String result = fm.steal(currentUser, victim, sIdx);
 
@@ -160,9 +162,20 @@ class ClientHandler implements Runnable {
                     res.setSuccess(false);
                     res.setMessage(result);
                 }
+                // Return victim's farm to update view
                 res.setData(fm.getFarm(victim));
                 break;
         }
+
+        // Always attach the current user's coin balance to the response
+        // This ensures the UI shows MY coins even when looking at OTHER farms.
+        if (currentUser != null) {
+            Farm myFarm = fm.getFarm(currentUser);
+            if (myFarm != null) {
+                res.setUserCoins(myFarm.getCoins());
+            }
+        }
+
         return res;
     }
 

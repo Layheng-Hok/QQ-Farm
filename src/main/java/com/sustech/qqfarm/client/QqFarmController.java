@@ -109,8 +109,15 @@ public class QqFarmController {
     private void handleResponse(NetMessage msg) {
         if (msg.getMessage() != null) lblMessage.setText(msg.getMessage());
 
+        // Update coins from the message envelope if available
+        // This ensures we see OUR coins even if we are looking at a friend's farm
+        if (msg.getUserCoins() != -1) {
+            lblCoins.setText("Coins: " + msg.getUserCoins());
+        }
+
         if (msg.getCommand() == Command.UPDATE) {
             Farm f = (Farm) msg.getData();
+            // Only refresh the grid if the update is for the farm we are currently looking at
             if (f.getOwner().equals(currentViewUser)) {
                 currentFarmState = f;
                 renderFarm(f);
@@ -126,14 +133,15 @@ public class QqFarmController {
 
     private void renderFarm(Farm farm) {
         lblUser.setText("Farm Owner: " + farm.getOwner());
+
+        // Logic for buttons
         if(farm.getOwner().equals(myUsername)) {
-            lblCoins.setText("Coins: " + farm.getCoins());
             btnMyFarm.setDisable(true);
         } else {
-            lblCoins.setText("Coins: ???");
             btnMyFarm.setDisable(false);
         }
 
+        // Render Plots
         gridFarm.getChildren().clear();
         for (int i = 0; i < farm.getPlots().size(); i++) {
             Plot p = farm.getPlots().get(i);
@@ -244,7 +252,6 @@ public class QqFarmController {
     @FXML
     public void onStealClick() {
         if (selectedPlotIndex != -1) {
-            // Updated to send both plot index (data) and victim owner (targetUser)
             send(Command.STEAL, selectedPlotIndex, currentViewUser);
         }
     }

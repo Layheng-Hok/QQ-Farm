@@ -9,6 +9,7 @@ public class NetMessage implements Serializable {
     private String message;
     private Object data; // Can hold Farm, String (username), or Integer (index)
     private String targetUser;
+    private int userCoins = -1; // Explicitly carry the requester's coin balance
 
     public NetMessage(Command command) { this.command = command; }
 
@@ -46,5 +47,13 @@ public class NetMessage implements Serializable {
 
     public void setTargetUser(String targetUser) {
         this.targetUser = targetUser;
+    }
+
+    public int getUserCoins() {
+        return userCoins;
+    }
+
+    public void setUserCoins(int userCoins) {
+        this.userCoins = userCoins;
     }
 }
