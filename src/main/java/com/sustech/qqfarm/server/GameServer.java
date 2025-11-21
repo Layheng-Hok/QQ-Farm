@@ -1,0 +1,168 @@
+package com.sustech.qqfarm.server;
+
+import com.sustech.qqfarm.common.*;
+
+import java.io.*;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.concurrent.*;
+
+public class GameServer {
+    private static final int PORT = 6969;
+    // To broadcast updates to connected clients
+    public static ConcurrentHashMap<String, ObjectOutputStream> onlineClients = new ConcurrentHashMap<>();
+
+    public static void main(String[] args) {
+        System.out.println("Starting QQ Farm Server on port " + PORT);
+
+        // 1. Start Background Timer for Crop Growth
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+        scheduler.scheduleAtFixedRate(() -> {
+            FarmManager.getInstance().updateGrowthStates();
+            // Optional: Push updates could happen here, but for simplicity,
+            // clients poll or we push on specific events.
+        }, 1, 1, TimeUnit.SECONDS);
+
+        // 2. Accept Connections
+        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
+            ExecutorService pool = Executors.newCachedThreadPool();
+            while (true) {
+                Socket client = serverSocket.accept();
+                pool.execute(new ClientHandler(client));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+class ClientHandler implements Runnable {
+    private Socket socket;
+    private ObjectOutputStream out;
+    private ObjectInputStream in;
+    private String currentUser;
+
+    public ClientHandler(Socket socket) {
+        this.socket = socket;
+    }
+
+    @Override
+    public void run() {
+        try {
+            out = new ObjectOutputStream(socket.getOutputStream());
+            in = new ObjectInputStream(socket.getInputStream());
+
+            while (true) {
+                Object obj = in.readObject();
+                if (obj instanceof NetMessage) {
+                    NetMessage request = (NetMessage) obj;
+                    NetMessage response = handleRequest(request);
+                    if (response != null) {
+                        send(response);
+                    }
+                }
+            }
+        } catch (EOFException | java.net.SocketException e) {
+            System.out.println("Client disconnected: " + currentUser);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (currentUser != null) GameServer.onlineClients.remove(currentUser);
+            try { socket.close(); } catch (IOException ignored) {}
+        }
+    }
+
+    private NetMessage handleRequest(NetMessage req) {
+        FarmManager fm = FarmManager.getInstance();
+        NetMessage res = new NetMessage(req.getCommand());
+        res.setSuccess(true);
+
+        switch (req.getCommand()) {
+            case LOGIN:
+                currentUser = (String) req.getData();
+                GameServer.onlineClients.put(currentUser, out);
+                fm.getOrCreateFarm(currentUser); // Ensure farm exists
+                res.setMessage("Logged in as " + currentUser);
+                res.setData(fm.getFarm(currentUser));
+                break;
+
+            case GET_FARM:
+                // Get own farm or friend's farm
+                String target = req.getTargetUser() != null ? req.getTargetUser() : currentUser;
+                Farm f = fm.getFarm(target);
+                if (f == null) {
+                    res.setSuccess(false);
+                    res.setMessage("Farm not found");
+                } else {
+                    res.setData(f);
+                }
+                break;
+
+            case PLANT:
+                int pIdx = (Integer) req.getData();
+                boolean pOk = fm.plant(currentUser, pIdx);
+                res.setSuccess(pOk);
+                res.setMessage(pOk ? "Planted successfully" : "Failed to plant (Check coins or plot)");
+                res.setData(fm.getFarm(currentUser)); // Return updated farm
+                notifyUpdate(currentUser); // Notify self (and potentially viewers)
+                break;
+
+            case HARVEST:
+                int hIdx = (Integer) req.getData();
+                boolean hOk = fm.harvest(currentUser, hIdx);
+                res.setSuccess(hOk);
+                res.setMessage(hOk ? "Harvested! +12 Coins" : "Not ripe yet");
+                res.setData(fm.getFarm(currentUser));
+                notifyUpdate(currentUser);
+                break;
+
+            case STEAL:
+                String victim = req.getTargetUser();
+                String result = fm.steal(currentUser, victim);
+                if ("SUCCESS".equals(result)) {
+                    res.setSuccess(true);
+                    res.setMessage("You stole a crop! +12 Coins");
+                    // Notify the victim their farm changed
+                    notifyUpdate(victim);
+                } else {
+                    res.setSuccess(false);
+                    res.setMessage(result);
+                }
+                // Return the victim's farm state so the UI updates
+                res.setData(fm.getFarm(victim));
+                break;
+        }
+        return res;
+    }
+
+    private void send(NetMessage msg) {
+        try {
+            out.writeObject(msg);
+            out.flush();
+            out.reset(); // Important for object streams
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Helper: If a farm changes, tell the owner (if online) to refresh
+    private void notifyUpdate(String username) {
+        ObjectOutputStream ownerOut = GameServer.onlineClients.get(username);
+        if (ownerOut != null) {
+            try {
+                NetMessage update = new NetMessage(Command.UPDATE);
+                update.setMessage("Farm Updated");
+                update.setData(FarmManager.getInstance().getFarm(username));
+                // Write directly to the other thread's stream (requires synchronization in a real app,
+                // but OOS is synchronized enough for this simple lab)
+                synchronized (ownerOut) {
+                    ownerOut.writeObject(update);
+                    ownerOut.flush();
+                    ownerOut.reset();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
