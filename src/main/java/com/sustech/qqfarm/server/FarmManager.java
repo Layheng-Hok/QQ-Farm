@@ -12,9 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class FarmManager {
     private static final FarmManager instance = new FarmManager();
     private final Map<String, Farm> farms = new ConcurrentHashMap<>();
-
-    // Track who is looking at what: Map<Viewer, FarmOwner>
-    private final Map<String, String> playerViews = new ConcurrentHashMap<>();
+    private final Map<String, String> playerViews = new ConcurrentHashMap<>(); // Track who is looking at what: Map<Viewer, FarmOwner>
 
     private FarmManager() {}
 
@@ -73,6 +71,10 @@ public class FarmManager {
             farm.setCoins(farm.getCoins() + 12);
             plot.setState(PlotState.EMPTY);
             System.out.println("[LOG] " + username + " harvested plot " + plotIndex);
+
+            // Clean up history if no ripe crops remain
+            checkAndResetHistory(farm);
+
             return true;
         }
     }
@@ -85,7 +87,6 @@ public class FarmManager {
         if (victimFarm == null || thiefFarm == null) return "Farm not found.";
 
         // --- ENFORCE AWAY RULE ---
-        // Check if victim is online AND viewing their own farm
         String victimCurrentView = playerViews.get(victimName);
         if (victimCurrentView != null && victimCurrentView.equals(victimName)) {
             return "Owner is watching! Stealing failed.";
@@ -101,10 +102,18 @@ public class FarmManager {
 
             if (ripeCount == 0) return "No ripe crops to steal.";
 
-            // Rule: Ensure total ripe count supports stealing (at least 4 crops usually)
-            int maxStealable = (int) (ripeCount * 0.25);
-            if (maxStealable < 1) {
-                return "Too few crops to steal (Protection Active).";
+            // --- ENFORCE 25% RULE ---
+            // We verify the limit against (Current Available + Already Stolen By You).
+            // This prevents the logic flaw where stealing reduces the count,
+            // allowing you to steal again in the next click.
+            int stolenByMe = victimFarm.getStealHistory().getOrDefault(thiefName, 0);
+            long virtualTotal = ripeCount + stolenByMe;
+
+            // Calculate max allowed based on the state *before* this specific theft attempt
+            int maxAllowed = (int) (virtualTotal * 0.25);
+
+            if (stolenByMe >= maxAllowed) {
+                return "You have reached the theft limit (25%) for this farm.";
             }
 
             // --- STEAL SPECIFIC PLOT ---
@@ -121,12 +130,34 @@ public class FarmManager {
             // Execute Steal
             targetPlot.setState(PlotState.EMPTY);
 
+            // Update History
+            victimFarm.getStealHistory().put(thiefName, stolenByMe + 1);
+
             synchronized (thiefFarm) {
                 thiefFarm.setCoins(thiefFarm.getCoins() + 12);
             }
 
-            System.out.println("[LOG] " + thiefName + " stole plot " + plotIndex + " from " + victimName);
+            System.out.println("[LOG] " + thiefName + " stole plot " + plotIndex + " from " + victimName +
+                    " (Stolen: " + (stolenByMe + 1) + "/" + maxAllowed + ")");
+
+            // Clean up history if no ripe crops remain (Batch finished)
+            checkAndResetHistory(victimFarm);
+
             return "SUCCESS";
+        }
+    }
+
+    // Helper to clear steal history when the "batch" of ripe crops is gone
+    private void checkAndResetHistory(Farm farm) {
+        boolean hasRipe = false;
+        for (Plot p : farm.getPlots()) {
+            if (p.getState() == PlotState.RIPE) {
+                hasRipe = true;
+                break;
+            }
+        }
+        if (!hasRipe) {
+            farm.getStealHistory().clear();
         }
     }
 
