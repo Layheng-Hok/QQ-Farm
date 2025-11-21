@@ -11,8 +11,8 @@ public class QqFarmApplication extends Application {
     @Override
     public void start(Stage stage) throws IOException {
         FXMLLoader fxmlLoader = new FXMLLoader(QqFarmApplication.class.getResource("/com/sustech/qqfarm/qq-farm-view.fxml"));
-        Scene scene = new Scene(fxmlLoader.load(), 800, 600);
-        stage.setTitle("QQ Farm Client");
+        Scene scene = new Scene(fxmlLoader.load(), 600, 600);
+        stage.setTitle("QQ Farm Game");
         stage.setScene(scene);
         stage.show();
 
