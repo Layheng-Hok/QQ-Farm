@@ -40,18 +40,16 @@ public class QqFarmController {
 
     // State
     private Farm currentFarmState;
-    private int selectedPlotIndex = -1; // -1 means no plot selected
+    private int selectedPlotIndex = -1;
 
     @FXML
     public void initialize() {
         connectDialog();
-        // Start network listener thread
         new Thread(this::listen).start();
 
-        // Local timer to update "Growing" text countdowns immediately (visual only)
         Timeline timeline = new Timeline(new KeyFrame(Duration.seconds(1), ev -> {
             if (currentFarmState != null) {
-                renderFarm(currentFarmState); // Re-render to update text
+                renderFarm(currentFarmState);
             }
         }));
         timeline.setCycleCount(Timeline.INDEFINITE);
@@ -113,7 +111,6 @@ public class QqFarmController {
 
         if (msg.getCommand() == Command.UPDATE) {
             Farm f = (Farm) msg.getData();
-            // If the update matches the farm we are currently looking at, refresh UI
             if (f.getOwner().equals(currentViewUser)) {
                 currentFarmState = f;
                 renderFarm(f);
@@ -144,7 +141,6 @@ public class QqFarmController {
             gridFarm.add(plotPane, i % 4, i / 4);
         }
 
-        // Refresh button states based on selection and new farm data
         updateActionButtons();
     }
 
@@ -152,7 +148,6 @@ public class QqFarmController {
         StackPane stack = new StackPane();
         Rectangle rect = new Rectangle(80, 80);
 
-        // Visual Selection Logic
         if (index == selectedPlotIndex) {
             rect.setStroke(Color.BLUE);
             rect.setStrokeWidth(3);
@@ -179,10 +174,8 @@ public class QqFarmController {
 
         stack.getChildren().addAll(rect, statusText);
 
-        // Click to SELECT only
         stack.setOnMouseClicked(e -> {
             selectedPlotIndex = index;
-            // Force redraw to update border and buttons
             renderFarm(currentFarmState);
         });
 
@@ -190,7 +183,6 @@ public class QqFarmController {
     }
 
     private void updateActionButtons() {
-        // Default: Disable all
         btnPlant.setDisable(true);
         btnHarvest.setDisable(true);
         btnSteal.setDisable(true);
@@ -212,20 +204,17 @@ public class QqFarmController {
                 btnHarvest.setDisable(false);
             }
         } else {
-            // Visiting friend
             if (isRipe) {
                 btnSteal.setDisable(false);
             }
         }
     }
 
-    // --- Toolbar Actions ---
-
     @FXML
     public void onVisitClick() {
         String target = txtFriendName.getText();
         if (target != null && !target.isEmpty()) {
-            selectedPlotIndex = -1; // Reset selection
+            selectedPlotIndex = -1;
             currentViewUser = target;
             send(Command.GET_FARM, null, target);
         }
@@ -233,12 +222,10 @@ public class QqFarmController {
 
     @FXML
     public void onMyFarmClick() {
-        selectedPlotIndex = -1; // Reset selection
+        selectedPlotIndex = -1;
         currentViewUser = myUsername;
         send(Command.GET_FARM, null, myUsername);
     }
-
-    // --- Game Actions ---
 
     @FXML
     public void onPlantClick() {
@@ -256,11 +243,9 @@ public class QqFarmController {
 
     @FXML
     public void onStealClick() {
-        // Steal targets the whole farm owner, not a specific index usually,
-        // but our UI implies selecting a ripe crop. The server logic
-        // handles the "random" stealing or first ripe stealing.
         if (selectedPlotIndex != -1) {
-            send(Command.STEAL, null, currentViewUser);
+            // Updated to send both plot index (data) and victim owner (targetUser)
+            send(Command.STEAL, selectedPlotIndex, currentViewUser);
         }
     }
 }

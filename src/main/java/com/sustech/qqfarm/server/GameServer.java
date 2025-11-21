@@ -10,20 +10,15 @@ import java.util.concurrent.*;
 
 public class GameServer {
     private static final int PORT = 6969;
-    // To broadcast updates to connected clients
     public static ConcurrentHashMap<String, ObjectOutputStream> onlineClients = new ConcurrentHashMap<>();
 
     public static void main(String[] args) {
         System.out.println("Starting QQ Farm Server on port " + PORT);
 
-        // 1. Start Background Timer for Crop Growth
+        // 1. Background Timer for Crop Growth
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
         scheduler.scheduleAtFixedRate(() -> {
-            // Check for growth updates
             List<String> updatedOwners = FarmManager.getInstance().updateGrowthStates();
-
-            // If any farm updated, broadcast the new state to ALL clients
-            // (So visitors see the change immediately)
             if (!updatedOwners.isEmpty()) {
                 for (String owner : updatedOwners) {
                     Farm updatedFarm = FarmManager.getInstance().getFarm(owner);
@@ -47,7 +42,6 @@ public class GameServer {
         }
     }
 
-    // Broadcast a message to all connected clients
     public static void broadcast(NetMessage msg) {
         onlineClients.forEach((user, out) -> {
             try {
@@ -57,7 +51,7 @@ public class GameServer {
                     out.reset();
                 }
             } catch (IOException e) {
-                // Client might have disconnected, will be cleaned up by handler
+                // Handle in thread
             }
         });
     }
@@ -94,7 +88,10 @@ class ClientHandler implements Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            if (currentUser != null) GameServer.onlineClients.remove(currentUser);
+            if (currentUser != null) {
+                GameServer.onlineClients.remove(currentUser);
+                FarmManager.getInstance().removePlayer(currentUser); // Mark as offline (Away)
+            }
             try { socket.close(); } catch (IOException ignored) {}
         }
     }
@@ -108,13 +105,20 @@ class ClientHandler implements Runnable {
             case LOGIN:
                 currentUser = (String) req.getData();
                 GameServer.onlineClients.put(currentUser, out);
-                fm.getOrCreateFarm(currentUser); // Ensure farm exists
+                fm.getOrCreateFarm(currentUser);
+                // When logging in, user is viewing their own farm
+                fm.updatePlayerView(currentUser, currentUser);
+
                 res.setMessage("Logged in as " + currentUser);
                 res.setData(fm.getFarm(currentUser));
                 break;
 
             case GET_FARM:
                 String target = req.getTargetUser() != null ? req.getTargetUser() : currentUser;
+
+                // Update tracking: Current User is now looking at Target's farm
+                fm.updatePlayerView(currentUser, target);
+
                 Farm f = fm.getFarm(target);
                 if (f == null) {
                     res.setSuccess(false);
@@ -128,7 +132,7 @@ class ClientHandler implements Runnable {
                 int pIdx = (Integer) req.getData();
                 boolean pOk = fm.plant(currentUser, pIdx);
                 res.setSuccess(pOk);
-                res.setMessage(pOk ? "Planted successfully" : "Failed to plant (Check coins or plot)");
+                res.setMessage(pOk ? "Planted successfully" : "Failed to plant");
                 res.setData(fm.getFarm(currentUser));
                 if (pOk) broadcastUpdate(currentUser);
                 break;
@@ -144,11 +148,14 @@ class ClientHandler implements Runnable {
 
             case STEAL:
                 String victim = req.getTargetUser();
-                String result = fm.steal(currentUser, victim);
+                int sIdx = (Integer) req.getData(); // Get specific plot index
+
+                String result = fm.steal(currentUser, victim, sIdx);
+
                 if ("SUCCESS".equals(result)) {
                     res.setSuccess(true);
                     res.setMessage("You stole a crop! +12 Coins");
-                    broadcastUpdate(victim); // Update everyone looking at victim
+                    broadcastUpdate(victim);
                 } else {
                     res.setSuccess(false);
                     res.setMessage(result);

@@ -10,10 +10,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class FarmManager {
-    // Singleton instance
     private static final FarmManager instance = new FarmManager();
-    // Store farms: Username -> Farm
     private final Map<String, Farm> farms = new ConcurrentHashMap<>();
+
+    // Track who is looking at what: Map<Viewer, FarmOwner>
+    private final Map<String, String> playerViews = new ConcurrentHashMap<>();
 
     private FarmManager() {}
 
@@ -27,6 +28,16 @@ public class FarmManager {
 
     public Farm getFarm(String username) {
         return farms.get(username);
+    }
+
+    // --- PRESENCE TRACKING ---
+
+    public void updatePlayerView(String viewer, String farmOwner) {
+        playerViews.put(viewer, farmOwner);
+    }
+
+    public void removePlayer(String username) {
+        playerViews.remove(username);
     }
 
     // --- ATOMIC OPERATIONS ---
@@ -66,49 +77,61 @@ public class FarmManager {
         }
     }
 
-    public String steal(String thiefName, String victimName) {
+    public String steal(String thiefName, String victimName, int plotIndex) {
         if (thiefName.equals(victimName)) return "Cannot steal from yourself.";
         Farm victimFarm = getFarm(victimName);
         Farm thiefFarm = getFarm(thiefName);
 
         if (victimFarm == null || thiefFarm == null) return "Farm not found.";
 
-        synchronized (victimFarm) {
-            long ripeCount = victimFarm.getPlots().stream()
-                    .filter(p -> p.getState() == PlotState.RIPE || p.isReadyToHarvest())
-                    .count();
+        // --- ENFORCE AWAY RULE ---
+        // Check if victim is online AND viewing their own farm
+        String victimCurrentView = playerViews.get(victimName);
+        if (victimCurrentView != null && victimCurrentView.equals(victimName)) {
+            return "Owner is watching! Stealing failed.";
+        }
 
-            // Force update dynamic states
+        synchronized (victimFarm) {
+            // Update states to ensure consistency
+            long ripeCount = 0;
             for(Plot p : victimFarm.getPlots()) {
                 if(p.isReadyToHarvest()) p.setState(PlotState.RIPE);
+                if(p.getState() == PlotState.RIPE) ripeCount++;
             }
 
             if (ripeCount == 0) return "No ripe crops to steal.";
 
+            // Rule: Ensure total ripe count supports stealing (at least 4 crops usually)
             int maxStealable = (int) (ripeCount * 0.25);
             if (maxStealable < 1) {
                 return "Too few crops to steal (Protection Active).";
             }
 
-            for (int i = 0; i < 16; i++) {
-                Plot p = victimFarm.getPlots().get(i);
-                if (p.getState() == PlotState.RIPE) {
-                    p.setState(PlotState.EMPTY);
-                    synchronized (thiefFarm) {
-                        thiefFarm.setCoins(thiefFarm.getCoins() + 12);
-                    }
-                    System.out.println("[LOG] " + thiefName + " stole from " + victimName + " plot " + i);
-                    return "SUCCESS";
-                }
+            // --- STEAL SPECIFIC PLOT ---
+            if (plotIndex < 0 || plotIndex >= victimFarm.getPlots().size()) {
+                return "Invalid plot.";
             }
+
+            Plot targetPlot = victimFarm.getPlots().get(plotIndex);
+
+            if (targetPlot.getState() != PlotState.RIPE) {
+                return "Selected plot is not ripe.";
+            }
+
+            // Execute Steal
+            targetPlot.setState(PlotState.EMPTY);
+
+            synchronized (thiefFarm) {
+                thiefFarm.setCoins(thiefFarm.getCoins() + 12);
+            }
+
+            System.out.println("[LOG] " + thiefName + " stole plot " + plotIndex + " from " + victimName);
+            return "SUCCESS";
         }
-        return "Steal failed.";
     }
 
-    // Background thread logic: returns list of owner names whose farms changed
     public List<String> updateGrowthStates() {
         List<String> changedFarms = new ArrayList<>();
-
         farms.values().forEach(farm -> {
             boolean changed = false;
             synchronized (farm) {
@@ -121,7 +144,6 @@ public class FarmManager {
             }
             if(changed) changedFarms.add(farm.getOwner());
         });
-
         return changedFarms;
     }
 }
