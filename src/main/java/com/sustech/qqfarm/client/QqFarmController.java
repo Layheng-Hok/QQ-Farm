@@ -1,6 +1,8 @@
 package com.sustech.qqfarm.client;
 
 import com.sustech.qqfarm.common.*;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
@@ -9,6 +11,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Text;
+import javafx.util.Duration;
 
 import java.io.*;
 import java.net.Socket;
@@ -23,21 +26,36 @@ public class QqFarmController {
     @FXML private TextField txtFriendName;
     @FXML private Button btnMyFarm;
 
+    // Action Buttons
+    @FXML private Button btnPlant;
+    @FXML private Button btnHarvest;
+    @FXML private Button btnSteal;
+
     // Network
     private Socket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
     private String myUsername;
-    private String currentViewUser; // Whose farm are we looking at?
+    private String currentViewUser;
 
     // State
     private Farm currentFarmState;
+    private int selectedPlotIndex = -1; // -1 means no plot selected
 
     @FXML
     public void initialize() {
         connectDialog();
-        // Start listener thread
+        // Start network listener thread
         new Thread(this::listen).start();
+
+        // Local timer to update "Growing" text countdowns immediately (visual only)
+        Timeline timeline = new Timeline(new KeyFrame(Duration.seconds(1), ev -> {
+            if (currentFarmState != null) {
+                renderFarm(currentFarmState); // Re-render to update text
+            }
+        }));
+        timeline.setCycleCount(Timeline.INDEFINITE);
+        timeline.play();
     }
 
     private void connectDialog() {
@@ -94,10 +112,10 @@ public class QqFarmController {
         if (msg.getMessage() != null) lblMessage.setText(msg.getMessage());
 
         if (msg.getCommand() == Command.UPDATE) {
-            // Server push update
             Farm f = (Farm) msg.getData();
-            // Only update if we are looking at this farm
+            // If the update matches the farm we are currently looking at, refresh UI
             if (f.getOwner().equals(currentViewUser)) {
+                currentFarmState = f;
                 renderFarm(f);
             }
             return;
@@ -111,7 +129,6 @@ public class QqFarmController {
 
     private void renderFarm(Farm farm) {
         lblUser.setText("Farm Owner: " + farm.getOwner());
-        // Only show coins if it's my farm (privacy?) - Requirement says "Surface coin balance"
         if(farm.getOwner().equals(myUsername)) {
             lblCoins.setText("Coins: " + farm.getCoins());
             btnMyFarm.setDisable(true);
@@ -126,16 +143,25 @@ public class QqFarmController {
             StackPane plotPane = createPlotView(p, i, farm.getOwner());
             gridFarm.add(plotPane, i % 4, i / 4);
         }
+
+        // Refresh button states based on selection and new farm data
+        updateActionButtons();
     }
 
     private StackPane createPlotView(Plot p, int index, String owner) {
         StackPane stack = new StackPane();
         Rectangle rect = new Rectangle(80, 80);
-        rect.setStroke(Color.BLACK);
+
+        // Visual Selection Logic
+        if (index == selectedPlotIndex) {
+            rect.setStroke(Color.BLUE);
+            rect.setStrokeWidth(3);
+        } else {
+            rect.setStroke(Color.BLACK);
+            rect.setStrokeWidth(1);
+        }
 
         Text statusText = new Text();
-
-        // Logic to handle local timer visualization
         long elapsed = System.currentTimeMillis() - p.getPlantedTime();
         boolean isReady = p.getState() == PlotState.GROWING && elapsed >= Plot.GROW_TIME_MS;
 
@@ -147,28 +173,50 @@ public class QqFarmController {
             statusText.setText("RIPE");
         } else {
             rect.setFill(Color.LIGHTGREEN);
-            statusText.setText("Growing\n" + (int)((Plot.GROW_TIME_MS - elapsed)/1000) + "s");
+            int remaining = (int)((Plot.GROW_TIME_MS - elapsed)/1000);
+            statusText.setText("Growing\n" + Math.max(0, remaining) + "s");
         }
 
         stack.getChildren().addAll(rect, statusText);
 
-        // Interaction
+        // Click to SELECT only
         stack.setOnMouseClicked(e -> {
-            if (owner.equals(myUsername)) {
-                if (p.getState() == PlotState.EMPTY) {
-                    send(Command.PLANT, index, null);
-                } else if (p.getState() == PlotState.RIPE || isReady) {
-                    send(Command.HARVEST, index, null);
-                }
-            } else {
-                // Visiting someone else
-                if (p.getState() == PlotState.RIPE || isReady) {
-                    send(Command.STEAL, null, owner);
-                }
-            }
+            selectedPlotIndex = index;
+            // Force redraw to update border and buttons
+            renderFarm(currentFarmState);
         });
 
         return stack;
+    }
+
+    private void updateActionButtons() {
+        // Default: Disable all
+        btnPlant.setDisable(true);
+        btnHarvest.setDisable(true);
+        btnSteal.setDisable(true);
+
+        if (currentFarmState == null || selectedPlotIndex == -1) return;
+
+        Plot p = currentFarmState.getPlots().get(selectedPlotIndex);
+        long elapsed = System.currentTimeMillis() - p.getPlantedTime();
+        boolean isReady = p.getState() == PlotState.GROWING && elapsed >= Plot.GROW_TIME_MS;
+        boolean isRipe = p.getState() == PlotState.RIPE || isReady;
+
+        boolean isMyFarm = currentFarmState.getOwner().equals(myUsername);
+
+        if (isMyFarm) {
+            if (p.getState() == PlotState.EMPTY) {
+                btnPlant.setDisable(false);
+            }
+            if (isRipe) {
+                btnHarvest.setDisable(false);
+            }
+        } else {
+            // Visiting friend
+            if (isRipe) {
+                btnSteal.setDisable(false);
+            }
+        }
     }
 
     // --- Toolbar Actions ---
@@ -177,6 +225,7 @@ public class QqFarmController {
     public void onVisitClick() {
         String target = txtFriendName.getText();
         if (target != null && !target.isEmpty()) {
+            selectedPlotIndex = -1; // Reset selection
             currentViewUser = target;
             send(Command.GET_FARM, null, target);
         }
@@ -184,12 +233,34 @@ public class QqFarmController {
 
     @FXML
     public void onMyFarmClick() {
+        selectedPlotIndex = -1; // Reset selection
         currentViewUser = myUsername;
         send(Command.GET_FARM, null, myUsername);
     }
 
+    // --- Game Actions ---
+
     @FXML
-    public void onRefreshClick() {
-        send(Command.GET_FARM, null, currentViewUser);
+    public void onPlantClick() {
+        if (selectedPlotIndex != -1) {
+            send(Command.PLANT, selectedPlotIndex, null);
+        }
+    }
+
+    @FXML
+    public void onHarvestClick() {
+        if (selectedPlotIndex != -1) {
+            send(Command.HARVEST, selectedPlotIndex, null);
+        }
+    }
+
+    @FXML
+    public void onStealClick() {
+        // Steal targets the whole farm owner, not a specific index usually,
+        // but our UI implies selecting a ripe crop. The server logic
+        // handles the "random" stealing or first ripe stealing.
+        if (selectedPlotIndex != -1) {
+            send(Command.STEAL, null, currentViewUser);
+        }
     }
 }

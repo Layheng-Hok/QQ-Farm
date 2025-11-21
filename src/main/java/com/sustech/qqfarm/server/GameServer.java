@@ -5,6 +5,7 @@ import com.sustech.qqfarm.common.*;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.List;
 import java.util.concurrent.*;
 
 public class GameServer {
@@ -18,9 +19,20 @@ public class GameServer {
         // 1. Start Background Timer for Crop Growth
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
         scheduler.scheduleAtFixedRate(() -> {
-            FarmManager.getInstance().updateGrowthStates();
-            // Optional: Push updates could happen here, but for simplicity,
-            // clients poll or we push on specific events.
+            // Check for growth updates
+            List<String> updatedOwners = FarmManager.getInstance().updateGrowthStates();
+
+            // If any farm updated, broadcast the new state to ALL clients
+            // (So visitors see the change immediately)
+            if (!updatedOwners.isEmpty()) {
+                for (String owner : updatedOwners) {
+                    Farm updatedFarm = FarmManager.getInstance().getFarm(owner);
+                    NetMessage updateMsg = new NetMessage(Command.UPDATE);
+                    updateMsg.setMessage("Farm Updated");
+                    updateMsg.setData(updatedFarm);
+                    broadcast(updateMsg);
+                }
+            }
         }, 1, 1, TimeUnit.SECONDS);
 
         // 2. Accept Connections
@@ -33,6 +45,21 @@ public class GameServer {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    // Broadcast a message to all connected clients
+    public static void broadcast(NetMessage msg) {
+        onlineClients.forEach((user, out) -> {
+            try {
+                synchronized (out) {
+                    out.writeObject(msg);
+                    out.flush();
+                    out.reset();
+                }
+            } catch (IOException e) {
+                // Client might have disconnected, will be cleaned up by handler
+            }
+        });
     }
 }
 
@@ -87,7 +114,6 @@ class ClientHandler implements Runnable {
                 break;
 
             case GET_FARM:
-                // Get own farm or friend's farm
                 String target = req.getTargetUser() != null ? req.getTargetUser() : currentUser;
                 Farm f = fm.getFarm(target);
                 if (f == null) {
@@ -103,8 +129,8 @@ class ClientHandler implements Runnable {
                 boolean pOk = fm.plant(currentUser, pIdx);
                 res.setSuccess(pOk);
                 res.setMessage(pOk ? "Planted successfully" : "Failed to plant (Check coins or plot)");
-                res.setData(fm.getFarm(currentUser)); // Return updated farm
-                notifyUpdate(currentUser); // Notify self (and potentially viewers)
+                res.setData(fm.getFarm(currentUser));
+                if (pOk) broadcastUpdate(currentUser);
                 break;
 
             case HARVEST:
@@ -113,7 +139,7 @@ class ClientHandler implements Runnable {
                 res.setSuccess(hOk);
                 res.setMessage(hOk ? "Harvested! +12 Coins" : "Not ripe yet");
                 res.setData(fm.getFarm(currentUser));
-                notifyUpdate(currentUser);
+                if (hOk) broadcastUpdate(currentUser);
                 break;
 
             case STEAL:
@@ -122,13 +148,11 @@ class ClientHandler implements Runnable {
                 if ("SUCCESS".equals(result)) {
                     res.setSuccess(true);
                     res.setMessage("You stole a crop! +12 Coins");
-                    // Notify the victim their farm changed
-                    notifyUpdate(victim);
+                    broadcastUpdate(victim); // Update everyone looking at victim
                 } else {
                     res.setSuccess(false);
                     res.setMessage(result);
                 }
-                // Return the victim's farm state so the UI updates
                 res.setData(fm.getFarm(victim));
                 break;
         }
@@ -139,30 +163,16 @@ class ClientHandler implements Runnable {
         try {
             out.writeObject(msg);
             out.flush();
-            out.reset(); // Important for object streams
+            out.reset();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    // Helper: If a farm changes, tell the owner (if online) to refresh
-    private void notifyUpdate(String username) {
-        ObjectOutputStream ownerOut = GameServer.onlineClients.get(username);
-        if (ownerOut != null) {
-            try {
-                NetMessage update = new NetMessage(Command.UPDATE);
-                update.setMessage("Farm Updated");
-                update.setData(FarmManager.getInstance().getFarm(username));
-                // Write directly to the other thread's stream (requires synchronization in a real app,
-                // but OOS is synchronized enough for this simple lab)
-                synchronized (ownerOut) {
-                    ownerOut.writeObject(update);
-                    ownerOut.flush();
-                    ownerOut.reset();
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+    private void broadcastUpdate(String ownerName) {
+        NetMessage update = new NetMessage(Command.UPDATE);
+        update.setMessage("Farm Updated");
+        update.setData(FarmManager.getInstance().getFarm(ownerName));
+        GameServer.broadcast(update);
     }
 }
