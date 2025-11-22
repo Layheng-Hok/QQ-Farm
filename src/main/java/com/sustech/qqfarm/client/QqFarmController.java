@@ -6,11 +6,12 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
-import javafx.scene.text.Text;
 import javafx.util.Duration;
 
 import java.io.*;
@@ -41,6 +42,9 @@ public class QqFarmController {
     // State
     private Farm currentFarmState;
     private int selectedPlotIndex = -1;
+
+    // Asset Base Path
+    private static final String ASSET_PATH = "/com/sustech/qqfarm/assets/";
 
     @FXML
     public void initialize() {
@@ -109,15 +113,12 @@ public class QqFarmController {
     private void handleResponse(NetMessage msg) {
         if (msg.getMessage() != null) lblMessage.setText(msg.getMessage());
 
-        // Update coins from the message envelope if available
-        // This ensures we see OUR coins even if we are looking at a friend's farm
         if (msg.getUserCoins() != -1) {
             lblCoins.setText("Coins: " + msg.getUserCoins());
         }
 
         if (msg.getCommand() == Command.UPDATE) {
             Farm f = (Farm) msg.getData();
-            // Only refresh the grid if the update is for the farm we are currently looking at
             if (f.getOwner().equals(currentViewUser)) {
                 currentFarmState = f;
                 renderFarm(f);
@@ -134,60 +135,136 @@ public class QqFarmController {
     private void renderFarm(Farm farm) {
         lblUser.setText("Farm Owner: " + farm.getOwner());
 
-        // Logic for buttons
         if(farm.getOwner().equals(myUsername)) {
             btnMyFarm.setDisable(true);
         } else {
             btnMyFarm.setDisable(false);
         }
 
-        // Render Plots
         gridFarm.getChildren().clear();
         for (int i = 0; i < farm.getPlots().size(); i++) {
             Plot p = farm.getPlots().get(i);
-            StackPane plotPane = createPlotView(p, i, farm.getOwner());
+            StackPane plotPane = createPlotView(p, i);
             gridFarm.add(plotPane, i % 4, i / 4);
         }
 
         updateActionButtons();
     }
 
-    private StackPane createPlotView(Plot p, int index, String owner) {
+    /**
+     * Creates the visual representation of a plot using images.
+     */
+    private StackPane createPlotView(Plot p, int index) {
         StackPane stack = new StackPane();
-        Rectangle rect = new Rectangle(80, 80);
 
+        int row = index / 4; // 0-3
+        int col = index % 4; // 0-3
+
+        // 1. Determine Background Plot Image
+        String plotImageName = getPlotImageName(row, col);
+        ImageView bgView = loadImageView("plots/" + plotImageName);
+
+        // 2. Determine Crop Overlay Image
+        ImageView cropView = null;
+        if (p.getState() != PlotState.EMPTY) {
+            String cropImageName = getCropImageName(p, row);
+            if (cropImageName != null) {
+                cropView = loadImageView("crops/" + cropImageName);
+            }
+        }
+
+        // 3. Selection Indicator (Border)
+        Rectangle border = new Rectangle(64, 64); // Matches scaled image size
+        border.setFill(Color.TRANSPARENT);
         if (index == selectedPlotIndex) {
-            rect.setStroke(Color.BLUE);
-            rect.setStrokeWidth(3);
+            border.setStroke(Color.BLUE);
+            border.setStrokeWidth(3);
         } else {
-            rect.setStroke(Color.BLACK);
-            rect.setStrokeWidth(1);
+            border.setStroke(Color.TRANSPARENT);
         }
 
-        Text statusText = new Text();
-        long elapsed = System.currentTimeMillis() - p.getPlantedTime();
-        boolean isReady = p.getState() == PlotState.GROWING && elapsed >= Plot.GROW_TIME_MS;
-
-        if (p.getState() == PlotState.EMPTY) {
-            rect.setFill(Color.SADDLEBROWN);
-            statusText.setText("Empty");
-        } else if (p.getState() == PlotState.RIPE || isReady) {
-            rect.setFill(Color.GOLD);
-            statusText.setText("RIPE");
-        } else {
-            rect.setFill(Color.LIGHTGREEN);
-            int remaining = (int)((Plot.GROW_TIME_MS - elapsed)/1000);
-            statusText.setText("Growing\n" + Math.max(0, remaining) + "s");
+        // Add layers to stack
+        stack.getChildren().add(bgView);
+        if (cropView != null) {
+            stack.getChildren().add(cropView);
         }
+        stack.getChildren().add(border);
 
-        stack.getChildren().addAll(rect, statusText);
-
+        // Click handler
         stack.setOnMouseClicked(e -> {
             selectedPlotIndex = index;
             renderFarm(currentFarmState);
         });
 
         return stack;
+    }
+
+    /**
+     * Helper to load image resource and scale it for display.
+     * Original images are 16x16, we scale to 64x64 for visibility.
+     */
+    private ImageView loadImageView(String relativePath) {
+        try {
+            InputStream is = getClass().getResourceAsStream(ASSET_PATH + relativePath);
+            if (is != null) {
+                Image img = new Image(is);
+                ImageView iv = new ImageView(img);
+                iv.setFitWidth(64);
+                iv.setFitHeight(64);
+                iv.setPreserveRatio(true);
+                return iv;
+            }
+        } catch (Exception e) {
+            System.err.println("Could not load image: " + relativePath);
+        }
+        return new ImageView(); // Return empty if failed
+    }
+
+    private String getPlotImageName(int row, int col) {
+        // Top Row (0)
+        if (row == 0) {
+            if (col == 0) return "top-left-plot.png";
+            if (col == 3) return "top-right-plot.png";
+            return "top-center-plot.png";
+        }
+        // Bottom Row (3)
+        else if (row == 3) {
+            if (col == 0) return "bottom-left-plot.png";
+            if (col == 3) return "bottom-right-plot.png";
+            return "bottom-center-plot.png";
+        }
+        // Middle Rows (1, 2)
+        else {
+            if (col == 0) return "center-left-plot.png";
+            if (col == 3) return "center-right-plot.png";
+            return "center-center-plot.png";
+        }
+    }
+
+    private String getCropImageName(Plot p, int gridRow) {
+        // Image assets rely on 1-based row index (row1...row4)
+        int imgRow = gridRow + 1;
+        long elapsed = System.currentTimeMillis() - p.getPlantedTime();
+        boolean isReadyTimeWise = elapsed >= Plot.GROW_TIME_MS;
+
+        // Check for RIPE
+        if (p.getState() == PlotState.RIPE || (p.getState() == PlotState.GROWING && isReadyTimeWise)) {
+            return "row" + imgRow + "-ripe.png";
+        }
+
+        // Check for GROWING stages
+        if (p.getState() == PlotState.GROWING) {
+            // Total time is 6000ms. Half is 3000ms.
+            boolean isHalfGrown = elapsed >= (Plot.GROW_TIME_MS / 2);
+
+            if (isHalfGrown) {
+                return "row" + imgRow + "-growing-50.png";
+            } else {
+                return "row" + imgRow + "-growing-0.png";
+            }
+        }
+
+        return null;
     }
 
     private void updateActionButtons() {
