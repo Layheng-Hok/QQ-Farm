@@ -6,7 +6,10 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Cursor;
-import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
@@ -16,23 +19,35 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.StrokeType;
 import javafx.util.Duration;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.Optional;
 
 public class QqFarmController {
 
-    @FXML private Label lblUser;
-    @FXML private Label lblCoins;
-    @FXML private Label lblMessage;
-    @FXML private GridPane gridFarm;
-    @FXML private TextField txtFriendName;
-    @FXML private Button btnMyFarm;
+    @FXML
+    private Label lblUser;
+    @FXML
+    private Label lblCoins;
+    @FXML
+    private Label lblMessage;
+    @FXML
+    private GridPane gridFarm;
+    @FXML
+    private TextField txtFriendName;
+    @FXML
+    private Button btnMyFarm;
 
     // Action Buttons
-    @FXML private Button btnPlant;
-    @FXML private Button btnHarvest;
-    @FXML private Button btnSteal;
+    @FXML
+    private Button btnPlant;
+    @FXML
+    private Button btnHarvest;
+    @FXML
+    private Button btnSteal;
 
     // Network
     private Socket socket;
@@ -139,20 +154,129 @@ public class QqFarmController {
     private void renderFarm(Farm farm) {
         lblUser.setText("Farm Owner: " + farm.getOwner());
 
-        if(farm.getOwner().equals(myUsername)) {
+        if (farm.getOwner().equals(myUsername)) {
             btnMyFarm.setDisable(true);
         } else {
             btnMyFarm.setDisable(false);
         }
 
         gridFarm.getChildren().clear();
-        for (int i = 0; i < farm.getPlots().size(); i++) {
-            Plot p = farm.getPlots().get(i);
-            StackPane plotPane = createPlotView(p, i);
-            gridFarm.add(plotPane, i % 4, i / 4);
+        for (int gridRow = 0; gridRow < 8; gridRow++) {
+            for (int gridCol = 0; gridCol < 8; gridCol++) {
+                if (gridRow >= 2 && gridRow <= 5 && gridCol >= 2 && gridCol <= 5) {
+                    // Render plot
+                    int plotIndex = (gridRow - 2) * 4 + (gridCol - 2);
+                    Plot p = farm.getPlots().get(plotIndex);
+                    StackPane plotPane = createPlotView(p, plotIndex);
+                    gridFarm.add(plotPane, gridCol, gridRow);
+                } else {
+                    // Render surrounding grass block
+                    StackPane grassPane = createGrassBlock(gridRow, gridCol);
+                    gridFarm.add(grassPane, gridCol, gridRow);
+                }
+            }
         }
 
         updateActionButtons();
+    }
+
+    private StackPane createGrassBlock(int gridRow, int gridCol) {
+        StackPane stack = new StackPane();
+
+        stack.setMinSize(PLOT_SIZE, PLOT_SIZE);
+        stack.setPrefSize(PLOT_SIZE, PLOT_SIZE);
+        stack.setMaxSize(PLOT_SIZE, PLOT_SIZE);
+
+        ImageView grassView = loadImageView("tiles/grass.png", PLOT_SIZE);
+        stack.getChildren().add(grassView);
+
+        // Overlay some with flower, stone, weed, or fence at 50% size
+        String overlay1 = null;
+        String overlay2 = null;
+
+        if (gridRow == 0 && gridCol == 0) overlay2 = "back-left-fence.png";
+        else if (gridRow == 0 && gridCol == 1) overlay2 = "back-center-fence.png";
+        else if (gridRow == 0 && gridCol == 2) overlay2 = "back-center-fence.png";
+        else if (gridRow == 0 && gridCol == 3) overlay2 = "back-center-fence.png";
+        else if (gridRow == 0 && gridCol == 4) overlay2 = "back-center-fence.png";
+        else if (gridRow == 0 && gridCol == 5) overlay2 = "back-center-fence.png";
+        else if (gridRow == 0 && gridCol == 6) overlay2 = "back-center-fence.png";
+        else if (gridRow == 0 && gridCol == 7) overlay2 = "back-right-fence.png";
+
+        else if (gridRow == 1 && gridCol == 0) overlay2 = "center-left-fence.png";
+        else if (gridRow == 1 && gridCol == 1) overlay1 = "stone.png";
+        else if (gridRow == 1 && gridCol == 2) overlay1 = "weed.png";
+        else if (gridRow == 1 && gridCol == 3) overlay1 = "weed.png";
+        else if (gridRow == 1 && gridCol == 4) overlay1 = "weed.png";
+        else if (gridRow == 1 && gridCol == 5) overlay1 = "flower.png";
+        else if (gridRow == 1 && gridCol == 6) overlay1 = "weed.png";
+        else if (gridRow == 1 && gridCol == 7) overlay2 = "center-right-fence.png";
+
+        else if (gridRow == 2 && gridCol == 0) overlay2 = "center-left-fence.png";
+        else if (gridRow == 2 && gridCol == 1) overlay1 = "weed.png";
+        else if (gridRow == 2 && gridCol == 2) overlay1 = "weed.png";
+        else if (gridRow == 2 && gridCol == 3) overlay1 = "weed.png";
+        else if (gridRow == 2 && gridCol == 4) overlay1 = "weed.png";
+        else if (gridRow == 2 && gridCol == 5) overlay1 = "weed.png";
+        else if (gridRow == 2 && gridCol == 6) overlay1 = "flower.png";
+        else if (gridRow == 2 && gridCol == 7) overlay2 = "center-right-fence.png";
+
+        else if (gridRow == 3 && gridCol == 0) overlay2 = "center-left-fence.png";
+        else if (gridRow == 3 && gridCol == 1) overlay1 = "flower.png";
+        else if (gridRow == 3 && gridCol == 2) overlay1 = "weed.png";
+        else if (gridRow == 3 && gridCol == 3) overlay1 = "weed.png";
+        else if (gridRow == 3 && gridCol == 4) overlay1 = "weed.png";
+        else if (gridRow == 3 && gridCol == 5) overlay1 = "weed.png";
+        else if (gridRow == 3 && gridCol == 6) overlay1 = "stone.png";
+        else if (gridRow == 3 && gridCol == 7) overlay2 = "center-right-fence.png";
+
+        else if (gridRow == 4 && gridCol == 0) overlay2 = "center-left-fence.png";
+        else if (gridRow == 4 && gridCol == 1) overlay1 = "stone.png";
+        else if (gridRow == 4 && gridCol == 2) overlay1 = "weed.png";
+        else if (gridRow == 4 && gridCol == 3) overlay1 = "weed.png";
+        else if (gridRow == 4 && gridCol == 4) overlay1 = "weed.png";
+        else if (gridRow == 4 && gridCol == 5) overlay1 = "weed.png";
+        else if (gridRow == 4 && gridCol == 6) overlay1 = "weed.png";
+        else if (gridRow == 4 && gridCol == 7) overlay2 = "center-right-fence.png";
+
+        else if (gridRow == 5 && gridCol == 0) overlay2 = "center-left-fence.png";
+        else if (gridRow == 5 && gridCol == 1) overlay1 = "weed.png";
+        else if (gridRow == 5 && gridCol == 2) overlay1 = "weed.png";
+        else if (gridRow == 5 && gridCol == 3) overlay1 = "weed.png";
+        else if (gridRow == 5 && gridCol == 4) overlay1 = "weed.png";
+        else if (gridRow == 5 && gridCol == 5) overlay1 = "weed.png";
+        else if (gridRow == 5 && gridCol == 6) overlay1 = "flower.png";
+        else if (gridRow == 5 && gridCol == 7) overlay2 = "center-right-fence.png";
+
+        else if (gridRow == 6 && gridCol == 0) overlay2 = "center-left-fence.png";
+        else if (gridRow == 6 && gridCol == 1) overlay1 = "flower.png";
+        else if (gridRow == 6 && gridCol == 2) overlay1 = "flower.png";
+        else if (gridRow == 6 && gridCol == 3) overlay1 = "stone.png";
+        else if (gridRow == 6 && gridCol == 4) overlay1 = "stone.png";
+        else if (gridRow == 6 && gridCol == 5) overlay1 = "weed.png";
+        else if (gridRow == 6 && gridCol == 6) overlay1 = "weed.png";
+        else if (gridRow == 6 && gridCol == 7) overlay2 = "center-right-fence.png";
+
+        else if (gridRow == 7 && gridCol == 0) overlay2 = "front-left-fence.png";
+        else if (gridRow == 7 && gridCol == 1) overlay2 = "back-center-fence.png";
+        else if (gridRow == 7 && gridCol == 2) overlay2 = "back-center-fence.png";
+        else if (gridRow == 7 && gridCol == 3) overlay1 = "stone.png";
+        else if (gridRow == 7 && gridCol == 4) overlay1 = "stone.png";
+        else if (gridRow == 7 && gridCol == 5) overlay2 = "back-center-fence.png";
+        else if (gridRow == 7 && gridCol == 6) overlay2 = "back-center-fence.png";
+        else if (gridRow == 7 && gridCol == 7) overlay2 = "front-right-fence.png";
+
+        if (overlay1 != null) {
+            ImageView overlayView = loadImageView("tiles/" + overlay1, PLOT_SIZE * 0.5);
+            stack.getChildren().add(overlayView);
+        }
+
+        if (overlay2 != null) {
+            ImageView overlayView = loadImageView("fences/" + overlay2, PLOT_SIZE);
+            stack.getChildren().add(overlayView);
+        }
+
+        return stack;
     }
 
     /**
