@@ -5,6 +5,7 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.scene.Cursor;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -12,6 +13,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.shape.StrokeType;
 import javafx.util.Duration;
 
 import java.io.*;
@@ -170,27 +172,29 @@ public class QqFarmController {
         String plotImageName = getPlotImageName(row, col);
         ImageView bgView = loadImageView("plots/" + plotImageName, PLOT_SIZE);
 
-        // 2. Determine Crop Overlay Image (90% Size)
+        // 2. Determine Crop Overlay Image
         ImageView cropView = null;
         if (p.getState() != PlotState.EMPTY) {
             String cropImageName = getCropImageName(p, row);
             if (cropImageName != null) {
-                // Scale crop to 90% so it fits nicely inside the plot
-                cropView = loadImageView("crops/" + cropImageName, PLOT_SIZE * 0.6);
+                cropView = loadImageView("crops/" + cropImageName, PLOT_SIZE * 0.5);
             }
         }
 
-        // 3. Selection Indicator (Border)
-        Rectangle border = new Rectangle(PLOT_SIZE, PLOT_SIZE);
-        border.setFill(Color.TRANSPARENT);
-        border.setMouseTransparent(true);
+        // 3. Selection/Hover Indicator Overlay
+        Rectangle selectionOverlay = new Rectangle(PLOT_SIZE, PLOT_SIZE);
+        selectionOverlay.setMouseTransparent(true); // Important: Let clicks pass through to the StackPane
+        selectionOverlay.setStrokeType(StrokeType.INSIDE);
 
         if (index == selectedPlotIndex) {
-            border.setStroke(Color.BLUE);
-            border.setStrokeWidth(2);
-            border.setStrokeType(javafx.scene.shape.StrokeType.INSIDE);
+            // "Selected" effect: Strong highlight
+            selectionOverlay.setFill(Color.rgb(255, 255, 255, 0.3));
+            selectionOverlay.setStroke(Color.WHITE);
+            selectionOverlay.setStrokeWidth(2);
         } else {
-            border.setStroke(Color.TRANSPARENT);
+            // Default: Invisible
+            selectionOverlay.setFill(Color.TRANSPARENT);
+            selectionOverlay.setStroke(Color.TRANSPARENT);
         }
 
         // Add layers to stack (StackPane automatically centers children)
@@ -198,12 +202,33 @@ public class QqFarmController {
         if (cropView != null) {
             stack.getChildren().add(cropView);
         }
-        stack.getChildren().add(border);
+        stack.getChildren().add(selectionOverlay);
 
-        // Click handler
+        // --- Event Handlers ---
+
+        // Click: Select the plot
         stack.setOnMouseClicked(e -> {
             selectedPlotIndex = index;
-            renderFarm(currentFarmState);
+            renderFarm(currentFarmState); // Re-render to update selection visuals
+        });
+
+        // Hover Enter: Show faint highlight if NOT selected
+        stack.setOnMouseEntered(e -> {
+            if (index != selectedPlotIndex) {
+                selectionOverlay.setFill(Color.rgb(255, 255, 255, 0.15)); // Faint white
+                selectionOverlay.setStroke(Color.rgb(255, 255, 255, 0.5)); // Faint border
+                selectionOverlay.setStrokeWidth(1);
+                stack.setCursor(Cursor.HAND); // Change cursor to hand
+            }
+        });
+
+        // Hover Exit: Remove highlight if NOT selected
+        stack.setOnMouseExited(e -> {
+            if (index != selectedPlotIndex) {
+                selectionOverlay.setFill(Color.TRANSPARENT);
+                selectionOverlay.setStroke(Color.TRANSPARENT);
+                stack.setCursor(Cursor.DEFAULT);
+            }
         });
 
         return stack;

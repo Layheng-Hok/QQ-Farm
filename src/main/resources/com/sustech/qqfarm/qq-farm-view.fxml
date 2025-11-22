@@ -49,7 +49,7 @@
             <VBox spacing="5" alignment="CENTER">
                 <Label text="Actions (Select Plot First)" style="-fx-font-size: 10px; -fx-text-fill: #666;"/>
                 <HBox spacing="10">
-                    <Button fx:id="btnPlant" text="Plant (-5$)" onAction="#onPlantClick" disable="true" style="-fx-base: #a2d9a2;"/>
+                    <Button fx:id="btnPlant" text="Plant" onAction="#onPlantClick" disable="true" style="-fx-base: #a2d9a2;"/>
                     <Button fx:id="btnHarvest" text="Harvest" onAction="#onHarvestClick" disable="true" style="-fx-base: #ffd700;"/>
                     <Button fx:id="btnSteal" text="Steal" onAction="#onStealClick" disable="true" style="-fx-base: #ff6b6b;"/>
                 </HBox>
