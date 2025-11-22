@@ -11,11 +11,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class FarmManager {
-
     private static final FarmManager instance = new FarmManager();
-
     private final Map<String, Farm> farms = new ConcurrentHashMap<>();
-
     private final Map<String, String> playerViews = new ConcurrentHashMap<>();
 
     private FarmManager() {
@@ -70,22 +67,27 @@ public class FarmManager {
         }
     }
 
-    public boolean harvest(String username, int plotIndex) {
+    public String harvest(String username, int plotIndex) {
         Farm farm = getFarm(username);
-        if (farm == null) return false;
+        if (farm == null) return "FAIL";
 
         synchronized (farm) {
             Plot plot = farm.getPlots().get(plotIndex);
             if (plot.isReadyToHarvest()) {
                 plot.setState(PlotState.RIPE);
             }
-            if (plot.getState() != PlotState.RIPE) return false;
+            boolean isRipe = plot.getState() == PlotState.RIPE;
+            boolean isStolen = plot.getState() == PlotState.STOLEN;
+            if (!isRipe && !isStolen) return "FAIL";
 
-            farm.setCoins(farm.getCoins() + 12);
+            if (isRipe) {
+                farm.setCoins(farm.getCoins() + 12);
+            } // else if isStolen, +0
+
             plot.setState(PlotState.EMPTY);
             System.out.println("[LOG] " + username + " harvested plot " + plotIndex);
             checkAndResetHistory(farm);
-            return true;
+            return isRipe ? "SUCCESS_HARVEST" : "SUCCESS_CLEAN";
         }
     }
 
@@ -121,7 +123,7 @@ public class FarmManager {
             Plot targetPlot = victimFarm.getPlots().get(plotIndex);
             if (targetPlot.getState() != PlotState.RIPE) return "Selected plot is not ripe.";
 
-            targetPlot.setState(PlotState.EMPTY);
+            targetPlot.setState(PlotState.STOLEN);
             victimFarm.getStealHistory().put(thiefName, stolenByMe + 1);
 
             synchronized (thiefFarm) {
@@ -163,5 +165,4 @@ public class FarmManager {
         });
         return changedFarms;
     }
-
 }

@@ -11,7 +11,9 @@ public class NetMessage implements Serializable {
     private String targetUser;
     private int userCoins = -1; // Explicitly carry the requester's coin balance
 
-    public NetMessage(Command command) { this.command = command; }
+    public NetMessage(Command command) {
+        this.command = command;
+    }
 
     public Command getCommand() {
         return command;

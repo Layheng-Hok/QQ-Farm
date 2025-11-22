@@ -99,11 +99,20 @@ class ClientHandler implements Runnable {
 
             case HARVEST:
                 int hIdx = (Integer) req.getData();
-                boolean hOk = fm.harvest(currentUser, hIdx);
-                res.setSuccess(hOk);
-                res.setMessage(hOk ? "Harvested! +12 Coins" : "Not ripe yet");
+                String hResult = String.valueOf(fm.harvest(currentUser, hIdx));
+                if (hResult.equals("SUCCESS_HARVEST")) {
+                    res.setSuccess(true);
+                    res.setMessage("Harvested! +12 Coins");
+                    broadcastUpdate(currentUser);
+                } else if (hResult.equals("SUCCESS_CLEAN")) {
+                    res.setSuccess(true);
+                    res.setMessage("Cleaned up stolen crop.");
+                    broadcastUpdate(currentUser);
+                } else {
+                    res.setSuccess(false);
+                    res.setMessage("Not ripe yet");
+                }
                 res.setData(fm.getFarm(currentUser));
-                if (hOk) broadcastUpdate(currentUser);
                 break;
 
             case STEAL:
@@ -157,5 +166,4 @@ class ClientHandler implements Runnable {
         update.setData(FarmManager.getInstance().getFarm(ownerName));
         GameServer.broadcast(update);
     }
-
 }

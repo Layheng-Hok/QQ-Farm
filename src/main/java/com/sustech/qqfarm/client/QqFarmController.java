@@ -453,6 +453,11 @@ public class QqFarmController {
         long elapsed = System.currentTimeMillis() - p.getPlantedTime();
         boolean isReadyTimeWise = elapsed >= Plot.GROW_TIME_MS;
 
+        // Check for STOLEN
+        if (p.getState() == PlotState.STOLEN) {
+            return "row" + imgRow + "-stolen.png";
+        }
+
         // Check for RIPE
         if (p.getState() == PlotState.RIPE || (p.getState() == PlotState.GROWING && isReadyTimeWise)) {
             return "row" + imgRow + "-ripe.png";
@@ -489,7 +494,7 @@ public class QqFarmController {
             if (p.getState() == PlotState.EMPTY) {
                 btnPlant.setDisable(false);
             }
-            if (isRipe) {
+            if (isRipe || p.getState() == PlotState.STOLEN) {
                 btnHarvest.setDisable(false);
             }
         } else {
