@@ -30,8 +30,7 @@
             <VBox spacing="5" alignment="CENTER">
                 <Label text="Farm Navigation" style="-fx-font-size: 10px; -fx-text-fill: #666;"/>
                 <HBox spacing="10">
-                    <Button fx:id="btnMyFarm" text="My Farm" onAction="#onMyFarmClick"
-                            style="-fx-focus-color: transparent; -fx-faint-focus-color: transparent;"/>
+                    <Button fx:id="btnMyFarm" text="My Farm" onAction="#onMyFarmClick"/>
                     <TextField fx:id="txtFriendName" promptText="Friend's Name" prefWidth="120"/>
                     <Button text="Visit" onAction="#onVisitClick"/>
                 </HBox>
