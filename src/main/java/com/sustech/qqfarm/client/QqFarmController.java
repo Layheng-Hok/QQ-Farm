@@ -46,6 +46,8 @@ public class QqFarmController {
     // Asset Base Path
     private static final String ASSET_PATH = "/com/sustech/qqfarm/assets/";
 
+    private static final int PLOT_SIZE = 48;
+
     @FXML
     public void initialize() {
         connectDialog();
@@ -157,41 +159,41 @@ public class QqFarmController {
     private StackPane createPlotView(Plot p, int index) {
         StackPane stack = new StackPane();
 
-        // FIX: Strictly enforce size to 64x64.
-        // This prevents the Layout Manager from adding sub-pixel gaps.
-        stack.setMinSize(64, 64);
-        stack.setPrefSize(64, 64);
-        stack.setMaxSize(64, 64);
+        stack.setMinSize(PLOT_SIZE, PLOT_SIZE);
+        stack.setPrefSize(PLOT_SIZE, PLOT_SIZE);
+        stack.setMaxSize(PLOT_SIZE, PLOT_SIZE);
 
         int row = index / 4; // 0-3
         int col = index % 4; // 0-3
 
-        // 1. Determine Background Plot Image
+        // 1. Determine Background Plot Image (100% Size)
         String plotImageName = getPlotImageName(row, col);
-        ImageView bgView = loadImageView("plots/" + plotImageName);
+        ImageView bgView = loadImageView("plots/" + plotImageName, PLOT_SIZE);
 
-        // 2. Determine Crop Overlay Image
+        // 2. Determine Crop Overlay Image (90% Size)
         ImageView cropView = null;
         if (p.getState() != PlotState.EMPTY) {
             String cropImageName = getCropImageName(p, row);
             if (cropImageName != null) {
-                cropView = loadImageView("crops/" + cropImageName);
+                // Scale crop to 90% so it fits nicely inside the plot
+                cropView = loadImageView("crops/" + cropImageName, PLOT_SIZE * 0.6);
             }
         }
 
         // 3. Selection Indicator (Border)
-        Rectangle border = new Rectangle(64, 64);
+        Rectangle border = new Rectangle(PLOT_SIZE, PLOT_SIZE);
         border.setFill(Color.TRANSPARENT);
-        border.setMouseTransparent(true); // Ensure click goes to stack
+        border.setMouseTransparent(true);
+
         if (index == selectedPlotIndex) {
             border.setStroke(Color.BLUE);
-            border.setStrokeWidth(3);
+            border.setStrokeWidth(2);
             border.setStrokeType(javafx.scene.shape.StrokeType.INSIDE);
         } else {
             border.setStroke(Color.TRANSPARENT);
         }
 
-        // Add layers to stack
+        // Add layers to stack (StackPane automatically centers children)
         stack.getChildren().add(bgView);
         if (cropView != null) {
             stack.getChildren().add(cropView);
@@ -209,23 +211,21 @@ public class QqFarmController {
 
     /**
      * Helper to load image resource and scale it for display.
-     * Original images are 16x16, we scale to 64x64.
+     * Now accepts a specific size to allow for crop scaling.
      */
-    private ImageView loadImageView(String relativePath) {
+    private ImageView loadImageView(String relativePath, double size) {
         try {
             InputStream is = getClass().getResourceAsStream(ASSET_PATH + relativePath);
             if (is != null) {
                 Image img = new Image(is);
                 ImageView iv = new ImageView(img);
-                iv.setFitWidth(64);
-                iv.setFitHeight(64);
 
-                // FIX: Disable smoothing for pixel art.
-                // Smooth interpolation can blur edges, creating visible transparent "gaps" at seams.
+                // Updated scaling to passed size
+                iv.setFitWidth(size);
+                iv.setFitHeight(size);
+
+                // Keep smooth false for crisp pixels
                 iv.setSmooth(false);
-
-                // FIX: Disable preserve ratio if we are forcing fitWidth/Height exactly.
-                // Sometimes aspect ratio calculation floats cause 63.99px result.
                 iv.setPreserveRatio(false);
 
                 return iv;
@@ -233,7 +233,7 @@ public class QqFarmController {
         } catch (Exception e) {
             System.err.println("Could not load image: " + relativePath);
         }
-        return new ImageView(); // Return empty if failed
+        return new ImageView();
     }
 
     private String getPlotImageName(int row, int col) {
