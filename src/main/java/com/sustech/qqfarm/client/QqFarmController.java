@@ -157,6 +157,12 @@ public class QqFarmController {
     private StackPane createPlotView(Plot p, int index) {
         StackPane stack = new StackPane();
 
+        // FIX: Strictly enforce size to 64x64.
+        // This prevents the Layout Manager from adding sub-pixel gaps.
+        stack.setMinSize(64, 64);
+        stack.setPrefSize(64, 64);
+        stack.setMaxSize(64, 64);
+
         int row = index / 4; // 0-3
         int col = index % 4; // 0-3
 
@@ -174,11 +180,13 @@ public class QqFarmController {
         }
 
         // 3. Selection Indicator (Border)
-        Rectangle border = new Rectangle(64, 64); // Matches scaled image size
+        Rectangle border = new Rectangle(64, 64);
         border.setFill(Color.TRANSPARENT);
+        border.setMouseTransparent(true); // Ensure click goes to stack
         if (index == selectedPlotIndex) {
             border.setStroke(Color.BLUE);
             border.setStrokeWidth(3);
+            border.setStrokeType(javafx.scene.shape.StrokeType.INSIDE);
         } else {
             border.setStroke(Color.TRANSPARENT);
         }
@@ -201,7 +209,7 @@ public class QqFarmController {
 
     /**
      * Helper to load image resource and scale it for display.
-     * Original images are 16x16, we scale to 64x64 for visibility.
+     * Original images are 16x16, we scale to 64x64.
      */
     private ImageView loadImageView(String relativePath) {
         try {
@@ -211,7 +219,15 @@ public class QqFarmController {
                 ImageView iv = new ImageView(img);
                 iv.setFitWidth(64);
                 iv.setFitHeight(64);
-                iv.setPreserveRatio(true);
+
+                // FIX: Disable smoothing for pixel art.
+                // Smooth interpolation can blur edges, creating visible transparent "gaps" at seams.
+                iv.setSmooth(false);
+
+                // FIX: Disable preserve ratio if we are forcing fitWidth/Height exactly.
+                // Sometimes aspect ratio calculation floats cause 63.99px result.
+                iv.setPreserveRatio(false);
+
                 return iv;
             }
         } catch (Exception e) {
