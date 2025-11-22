@@ -9,7 +9,7 @@
 
     <top>
         <VBox spacing="10" alignment="CENTER" style="-fx-background-color: #f0f0f0; -fx-padding: 10;">
-            <Label text="QQ Farm Simulator" textFill="#333">
+            <Label text="QQ Farm" textFill="#333">
                 <font>
                     <Font size="24.0"/>
                 </font>
@@ -33,7 +33,7 @@
             <VBox spacing="5" alignment="CENTER">
                 <Label text="Farm Navigation" style="-fx-font-size: 10px; -fx-text-fill: #666;"/>
                 <HBox spacing="10">
-                    <Button fx:id="btnMyFarm" text="Home (My Farm)" onAction="#onMyFarmClick"/>
+                    <Button fx:id="btnMyFarm" text="My Farm" onAction="#onMyFarmClick"/>
                     <TextField fx:id="txtFriendName" promptText="Friend's Name" prefWidth="120"/>
                     <Button text="Visit" onAction="#onVisitClick"/>
                 </HBox>
