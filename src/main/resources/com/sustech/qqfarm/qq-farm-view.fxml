@@ -5,10 +5,10 @@
 <?import javafx.scene.text.Font?>
 <BorderPane xmlns:fx="http://javafx.com/fxml"
             fx:controller="com.sustech.qqfarm.client.QqFarmController"
-            prefHeight="600.0" prefWidth="600.0">
+            prefHeight="480.0" prefWidth="650.0">
 
     <top>
-        <VBox spacing="10" alignment="CENTER" style="-fx-background-color: #f0f0f0; -fx-padding: 10;">
+        <VBox spacing="10" alignment="CENTER" style="-fx-background-color: #ddd; -fx-padding: 10;">
             <Label text="QQ Farm" textFill="#333">
                 <font>
                     <Font size="24.0"/>
@@ -24,7 +24,7 @@
 
     <center>
         <GridPane fx:id="gridFarm" alignment="CENTER" hgap="0" vgap="0"
-                  style="-fx-padding: 20; -fx-background-color: #F2BE7D;">
+                  style="-fx-padding: 0; -fx-background-color: #F2BE7D;">
         </GridPane>
     </center>
 
