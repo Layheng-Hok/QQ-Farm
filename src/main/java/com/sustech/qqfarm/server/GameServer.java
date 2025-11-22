@@ -1,15 +1,23 @@
 package com.sustech.qqfarm.server;
 
-import com.sustech.qqfarm.common.*;
+import com.sustech.qqfarm.common.Command;
+import com.sustech.qqfarm.common.Farm;
+import com.sustech.qqfarm.common.NetMessage;
 
-import java.io.*;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
 public class GameServer {
+
     private static final int PORT = 6969;
+
     public static ConcurrentHashMap<String, ObjectOutputStream> onlineClients = new ConcurrentHashMap<>();
 
     public static void main(String[] args) {
@@ -53,9 +61,11 @@ public class GameServer {
             }
         });
     }
+
 }
 
 class ClientHandler implements Runnable {
+
     private Socket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
@@ -90,7 +100,10 @@ class ClientHandler implements Runnable {
                 GameServer.onlineClients.remove(currentUser);
                 FarmManager.getInstance().removePlayer(currentUser);
             }
-            try { socket.close(); } catch (IOException ignored) {}
+            try {
+                socket.close();
+            } catch (IOException ignored) {
+            }
         }
     }
 
@@ -105,7 +118,6 @@ class ClientHandler implements Runnable {
                 GameServer.onlineClients.put(currentUser, out);
                 fm.getOrCreateFarm(currentUser);
                 fm.updatePlayerView(currentUser, currentUser);
-
                 res.setMessage("Logged in as " + currentUser);
                 res.setData(fm.getFarm(currentUser));
                 break;
@@ -113,7 +125,6 @@ class ClientHandler implements Runnable {
             case GET_FARM:
                 String target = req.getTargetUser() != null ? req.getTargetUser() : currentUser;
                 fm.updatePlayerView(currentUser, target);
-
                 Farm f = fm.getFarm(target);
                 if (f == null) {
                     res.setSuccess(false);
@@ -127,7 +138,6 @@ class ClientHandler implements Runnable {
                 int pIdx = (Integer) req.getData();
                 // FIX: Handle String return for specific error
                 String pResult = fm.plant(currentUser, pIdx);
-
                 if ("SUCCESS".equals(pResult)) {
                     res.setSuccess(true);
                     res.setMessage("Planted successfully");
@@ -151,9 +161,7 @@ class ClientHandler implements Runnable {
             case STEAL:
                 String victim = req.getTargetUser();
                 int sIdx = (Integer) req.getData();
-
                 String result = fm.steal(currentUser, victim, sIdx);
-
                 if ("SUCCESS".equals(result)) {
                     res.setSuccess(true);
                     res.setMessage("You stole a crop! +12 Coins");
@@ -164,6 +172,12 @@ class ClientHandler implements Runnable {
                 }
                 // Return victim's farm to update view
                 res.setData(fm.getFarm(victim));
+                break;
+
+            case GET_PLAYERS:
+                List<String> players = new ArrayList<>(fm.getAllPlayers());
+                players.remove(currentUser);
+                res.setData(players);
                 break;
         }
 
@@ -195,4 +209,5 @@ class ClientHandler implements Runnable {
         update.setData(FarmManager.getInstance().getFarm(ownerName));
         GameServer.broadcast(update);
     }
+
 }

@@ -6,7 +6,6 @@
 <BorderPane xmlns:fx="http://javafx.com/fxml"
             fx:controller="com.sustech.qqfarm.client.QqFarmController"
             prefHeight="480.0" prefWidth="650.0">
-
     <top>
         <VBox spacing="10" alignment="CENTER" style="-fx-background-color: #ddd; -fx-padding: 10;">
             <Label text="QQ Farm" textFill="#333">
@@ -21,13 +20,11 @@
             <Label fx:id="lblMessage" text="Ready" textFill="#555"/>
         </VBox>
     </top>
-
     <center>
         <GridPane fx:id="gridFarm" alignment="CENTER" hgap="0" vgap="0"
                   style="-fx-padding: 0; -fx-background-color: #F2BE7D;">
         </GridPane>
     </center>
-
     <bottom>
         <HBox spacing="10" alignment="CENTER" style="-fx-padding: 15; -fx-background-color: #ddd;">
             <VBox spacing="5" alignment="CENTER">
@@ -38,9 +35,7 @@
                     <Button text="Visit" onAction="#onVisitClick"/>
                 </HBox>
             </VBox>
-
             <Separator orientation="VERTICAL"/>
-
             <VBox spacing="5" alignment="CENTER">
                 <Label text="Actions (Select Plot First)" style="-fx-font-size: 10px; -fx-text-fill: #666;"/>
                 <HBox spacing="10">
@@ -54,5 +49,4 @@
             </VBox>
         </HBox>
     </bottom>
-
 </BorderPane>

@@ -7,14 +7,19 @@ import com.sustech.qqfarm.common.PlotState;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class FarmManager {
+
     private static final FarmManager instance = new FarmManager();
+
     private final Map<String, Farm> farms = new ConcurrentHashMap<>();
+
     private final Map<String, String> playerViews = new ConcurrentHashMap<>();
 
-    private FarmManager() {}
+    private FarmManager() {
+    }
 
     public static FarmManager getInstance() {
         return instance;
@@ -26,6 +31,10 @@ public class FarmManager {
 
     public Farm getFarm(String username) {
         return farms.get(username);
+    }
+
+    public Set<String> getAllPlayers() {
+        return farms.keySet();
     }
 
     public void updatePlayerView(String viewer, String farmOwner) {
@@ -75,7 +84,6 @@ public class FarmManager {
             farm.setCoins(farm.getCoins() + 12);
             plot.setState(PlotState.EMPTY);
             System.out.println("[LOG] " + username + " harvested plot " + plotIndex);
-
             checkAndResetHistory(farm);
             return true;
         }
@@ -83,9 +91,9 @@ public class FarmManager {
 
     public String steal(String thiefName, String victimName, int plotIndex) {
         if (thiefName.equals(victimName)) return "Cannot steal from yourself.";
+
         Farm victimFarm = getFarm(victimName);
         Farm thiefFarm = getFarm(thiefName);
-
         if (victimFarm == null || thiefFarm == null) return "Farm not found.";
 
         String victimCurrentView = playerViews.get(victimName);
@@ -95,24 +103,22 @@ public class FarmManager {
 
         synchronized (victimFarm) {
             long ripeCount = 0;
-            for(Plot p : victimFarm.getPlots()) {
-                if(p.isReadyToHarvest()) p.setState(PlotState.RIPE);
-                if(p.getState() == PlotState.RIPE) ripeCount++;
+            for (Plot p : victimFarm.getPlots()) {
+                if (p.isReadyToHarvest()) p.setState(PlotState.RIPE);
+                if (p.getState() == PlotState.RIPE) ripeCount++;
             }
-
             if (ripeCount == 0) return "No ripe crops to steal.";
 
             int stolenByMe = victimFarm.getStealHistory().getOrDefault(thiefName, 0);
             long virtualTotal = ripeCount + stolenByMe;
             int maxAllowed = (int) (virtualTotal * 0.25);
-
             if (stolenByMe >= maxAllowed) {
                 return "You have reached the theft limit (25%) for this farm.";
             }
 
             if (plotIndex < 0 || plotIndex >= victimFarm.getPlots().size()) return "Invalid plot.";
-            Plot targetPlot = victimFarm.getPlots().get(plotIndex);
 
+            Plot targetPlot = victimFarm.getPlots().get(plotIndex);
             if (targetPlot.getState() != PlotState.RIPE) return "Selected plot is not ripe.";
 
             targetPlot.setState(PlotState.EMPTY);
@@ -153,8 +159,9 @@ public class FarmManager {
                     }
                 }
             }
-            if(changed) changedFarms.add(farm.getOwner());
+            if (changed) changedFarms.add(farm.getOwner());
         });
         return changedFarms;
     }
+
 }

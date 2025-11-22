@@ -6,10 +6,7 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Cursor;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.TextField;
-import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
@@ -24,37 +21,50 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.util.List;
 import java.util.Optional;
 
 public class QqFarmController {
+
     @FXML
     private Label lblUser;
+
     @FXML
     private Label lblCoins;
+
     @FXML
     private Label lblMessage;
+
     @FXML
     private GridPane gridFarm;
+
     @FXML
     private TextField txtFriendName;
+
     @FXML
     private Button btnMyFarm;
+
     // Action Buttons
     @FXML
     private Button btnPlant;
+
     @FXML
     private Button btnHarvest;
+
     @FXML
     private Button btnSteal;
+
     // Network
     private Socket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
     private String myUsername;
     private String currentViewUser;
+
     // State
     private Farm currentFarmState;
     private int selectedPlotIndex = -1;
+
     // Asset Base Path
     private static final String ASSET_PATH = "/com/sustech/qqfarm/assets/";
     private static final int PLOT_SIZE = 48;
@@ -63,6 +73,7 @@ public class QqFarmController {
     public void initialize() {
         connectDialog();
         new Thread(this::listen).start();
+
         Timeline timeline = new Timeline(new KeyFrame(Duration.seconds(1), ev -> {
             if (currentFarmState != null) {
                 renderFarm(currentFarmState);
@@ -124,9 +135,11 @@ public class QqFarmController {
 
     private void handleResponse(NetMessage msg) {
         if (msg.getMessage() != null) lblMessage.setText(msg.getMessage());
+
         if (msg.getUserCoins() != -1) {
             lblCoins.setText("Coins: " + msg.getUserCoins());
         }
+
         if (msg.getCommand() == Command.UPDATE) {
             Farm f = (Farm) msg.getData();
             if (f.getOwner().equals(currentViewUser)) {
@@ -135,6 +148,30 @@ public class QqFarmController {
             }
             return;
         }
+
+        if (msg.getCommand() == Command.GET_PLAYERS) {
+            if (msg.isSuccess()) {
+                @SuppressWarnings("unchecked")
+                List<String> players = (List<String>) msg.getData();
+                if (!players.isEmpty()) {
+                    ChoiceDialog<String> dialog = new ChoiceDialog<>(players.get(0), players);
+                    dialog.setTitle("Friends List");
+                    dialog.setHeaderText("Select a friend to visit");
+                    dialog.setContentText("Friend:");
+                    Optional<String> result = dialog.showAndWait();
+                    result.ifPresent(friend -> {
+                        txtFriendName.setText(friend);
+                        selectedPlotIndex = -1;
+                        currentViewUser = friend;
+                        send(Command.GET_FARM, null, friend);
+                    });
+                } else {
+                    lblMessage.setText("No other players found.");
+                }
+            }
+            return;
+        }
+
         if (msg.getData() instanceof Farm) {
             currentFarmState = (Farm) msg.getData();
             renderFarm(currentFarmState);
@@ -143,12 +180,12 @@ public class QqFarmController {
 
     private void renderFarm(Farm farm) {
         lblUser.setText("Farm Owner: " + farm.getOwner());
-        if (farm.getOwner().equals(myUsername)) {
-            btnMyFarm.setDisable(true);
-        } else {
-            btnMyFarm.setDisable(false);
-        }
+
+        boolean isMyFarm = farm.getOwner().equals(myUsername);
+        btnMyFarm.setText(isMyFarm ? "Friends" : "My Farm");
+
         gridFarm.getChildren().clear();
+
         for (int gridRow = 0; gridRow < 10; gridRow++) {
             for (int gridCol = 0; gridCol < 10; gridCol++) {
                 if (gridRow >= 3 && gridRow <= 6 && gridCol >= 3 && gridCol <= 6) {
@@ -168,6 +205,7 @@ public class QqFarmController {
                 }
             }
         }
+
         updateActionButtons();
     }
 
@@ -253,7 +291,6 @@ public class QqFarmController {
             ImageView overlayView = loadImageView("decorations/" + overlay1, PLOT_SIZE * 0.8);
             stack.getChildren().add(overlayView);
         }
-
         if (overlay2 != null) {
             ImageView overlayView = loadImageView("fences/" + overlay2, PLOT_SIZE);
             stack.getChildren().add(overlayView);
@@ -272,7 +309,6 @@ public class QqFarmController {
         stack.getChildren().add(waterView);
 
         String overlay = null;
-
         if (gridRow == 9 && gridCol == 4) overlay = "path1.png";
         else if (gridRow == 9 && gridCol == 5) overlay = "path2.png";
         else if (gridRow == 6 && gridCol == 9) overlay = "lilypad.png";
@@ -294,11 +330,14 @@ public class QqFarmController {
         stack.setMinSize(PLOT_SIZE, PLOT_SIZE);
         stack.setPrefSize(PLOT_SIZE, PLOT_SIZE);
         stack.setMaxSize(PLOT_SIZE, PLOT_SIZE);
+
         int row = index / 4; // 0-3
         int col = index % 4; // 0-3
+
         // 1. Determine Background Plot Image (100% Size)
         String plotImageName = getPlotImageName(row, col);
         ImageView bgView = loadImageView("plots/" + plotImageName, PLOT_SIZE);
+
         // 2. Determine Crop Overlay Image
         ImageView cropView = null;
         if (p.getState() != PlotState.EMPTY) {
@@ -307,6 +346,7 @@ public class QqFarmController {
                 cropView = loadImageView("crops/" + cropImageName, PLOT_SIZE * 0.5);
             }
         }
+
         // 3. Selection/Hover Indicator Overlay
         Rectangle selectionOverlay = new Rectangle(PLOT_SIZE, PLOT_SIZE);
         selectionOverlay.setMouseTransparent(true); // Important: Let clicks pass through to the StackPane
@@ -321,18 +361,21 @@ public class QqFarmController {
             selectionOverlay.setFill(Color.TRANSPARENT);
             selectionOverlay.setStroke(Color.TRANSPARENT);
         }
+
         // Add layers to stack (StackPane automatically centers children)
         stack.getChildren().add(bgView);
         if (cropView != null) {
             stack.getChildren().add(cropView);
         }
         stack.getChildren().add(selectionOverlay);
+
         // --- Event Handlers ---
         // Click: Select the plot
         stack.setOnMouseClicked(e -> {
             selectedPlotIndex = index;
             renderFarm(currentFarmState); // Re-render to update selection visuals
         });
+
         // Hover Enter: Show faint highlight if NOT selected
         stack.setOnMouseEntered(e -> {
             if (index != selectedPlotIndex) {
@@ -342,6 +385,7 @@ public class QqFarmController {
                 stack.setCursor(Cursor.HAND); // Change cursor to hand
             }
         });
+
         // Hover Exit: Remove highlight if NOT selected
         stack.setOnMouseExited(e -> {
             if (index != selectedPlotIndex) {
@@ -350,6 +394,7 @@ public class QqFarmController {
                 stack.setCursor(Cursor.DEFAULT);
             }
         });
+
         return stack;
     }
 
@@ -401,12 +446,15 @@ public class QqFarmController {
     private String getCropImageName(Plot p, int gridRow) {
         // Image assets rely on 1-based row index (row1...row4)
         int imgRow = gridRow + 1;
+
         long elapsed = System.currentTimeMillis() - p.getPlantedTime();
         boolean isReadyTimeWise = elapsed >= Plot.GROW_TIME_MS;
+
         // Check for RIPE
         if (p.getState() == PlotState.RIPE || (p.getState() == PlotState.GROWING && isReadyTimeWise)) {
             return "row" + imgRow + "-ripe.png";
         }
+
         // Check for GROWING stages
         if (p.getState() == PlotState.GROWING) {
             // Total time is 6000ms. Half is 3000ms.
@@ -417,6 +465,7 @@ public class QqFarmController {
                 return "row" + imgRow + "-growing-0.png";
             }
         }
+
         return null;
     }
 
@@ -424,12 +473,15 @@ public class QqFarmController {
         btnPlant.setDisable(true);
         btnHarvest.setDisable(true);
         btnSteal.setDisable(true);
+
         if (currentFarmState == null || selectedPlotIndex == -1) return;
+
         Plot p = currentFarmState.getPlots().get(selectedPlotIndex);
         long elapsed = System.currentTimeMillis() - p.getPlantedTime();
         boolean isReady = p.getState() == PlotState.GROWING && elapsed >= Plot.GROW_TIME_MS;
         boolean isRipe = p.getState() == PlotState.RIPE || isReady;
         boolean isMyFarm = currentFarmState.getOwner().equals(myUsername);
+
         if (isMyFarm) {
             if (p.getState() == PlotState.EMPTY) {
                 btnPlant.setDisable(false);
@@ -456,9 +508,13 @@ public class QqFarmController {
 
     @FXML
     public void onMyFarmClick() {
-        selectedPlotIndex = -1;
-        currentViewUser = myUsername;
-        send(Command.GET_FARM, null, myUsername);
+        if (currentViewUser.equals(myUsername)) {
+            send(Command.GET_PLAYERS, null, null);
+        } else {
+            selectedPlotIndex = -1;
+            currentViewUser = myUsername;
+            send(Command.GET_FARM, null, myUsername);
+        }
     }
 
     @FXML
@@ -481,4 +537,5 @@ public class QqFarmController {
             send(Command.STEAL, selectedPlotIndex, currentViewUser);
         }
     }
+
 }

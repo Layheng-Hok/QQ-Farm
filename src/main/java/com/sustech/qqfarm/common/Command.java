@@ -5,6 +5,7 @@ public enum Command {
     PLANT,
     HARVEST,
     STEAL,
-    GET_FARM, // For visiting or refreshing
-    UPDATE    // Server push to client
+    GET_FARM, // For visiting
+    GET_PLAYERS,
+    UPDATE
 }
