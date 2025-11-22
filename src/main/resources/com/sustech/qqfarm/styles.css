@@ -1,0 +1,39 @@
+#rootPane {
+    -fx-background-image: url("https://thumbs.dreamstime.com/b/rural-landscape-farm-fields-background-game-style-cartoon-illustration-countryside-scene-farmland-barn-cartoon-rural-324768700.jpg");
+    -fx-background-size: cover;
+    -fx-background-position: center;
+}
+
+.nav-button {
+    -fx-background-color: linear-gradient(#4CAF50, #388E3C);
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 5;
+    -fx-padding: 5 10 5 10;
+}
+
+.text-field {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #4CAF50;
+    -fx-border-radius: 5;
+}
+
+.action-button {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 5;
+    -fx-padding: 5 10 5 10;
+}
+
+.plant {
+    -fx-background-color: #4CAF50;
+}
+
+.harvest {
+    -fx-background-color: #FFD700;
+    -fx-text-fill: black;
+}
+
+.steal {
+    -fx-background-color: #FF4500;
+}
