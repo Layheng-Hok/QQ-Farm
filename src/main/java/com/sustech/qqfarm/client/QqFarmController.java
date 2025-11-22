@@ -14,6 +14,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.StrokeType;
+import javafx.stage.Window;
 import javafx.util.Duration;
 
 import java.io.IOException;
@@ -158,6 +159,8 @@ public class QqFarmController {
                     dialog.setTitle("Friends List");
                     dialog.setHeaderText("Select a friend to visit");
                     dialog.setContentText("Friend:");
+                    Window mainWindow = gridFarm.getScene().getWindow();
+                    dialog.initOwner(mainWindow);
                     Optional<String> result = dialog.showAndWait();
                     result.ifPresent(friend -> {
                         txtFriendName.setText(friend);
