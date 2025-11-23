@@ -59,14 +59,6 @@ The client is a JavaFX application that connects to the server.
 2. On launch, enter a username in the login dialog.
 3. Multiple clients can be run to simulate multiplayer (e.g., open multiple terminal windows).
 
-### Testing
-
-Run unit tests (including concurrency tests like `StealConcurrencyTest`):
-
-```bash
-mvn test
-```
-
 ## Architecture
 
 QQ-Farm follows a client-server architecture to support multiplayer features like visiting farms and stealing crops. The
