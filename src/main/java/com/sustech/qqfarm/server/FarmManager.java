@@ -158,7 +158,7 @@ public class FarmManager {
             }
             if (plotIndex < 0 || plotIndex >= victimFarm.getPlots().size()) return "Invalid plot.";
             Plot targetPlot = victimFarm.getPlots().get(plotIndex);
-            if (targetPlot.getState() != PlotState.RIPE) return "Selected plot is not ripe.";
+            if (targetPlot.getState() != PlotState.RIPE) return "Selected plot is either not ripe or empty.";
             targetPlot.setState(PlotState.STOLEN);
             victimFarm.getStealHistory().put(thiefName, stolenByMe + 1);
             synchronized (thiefFarm) {
