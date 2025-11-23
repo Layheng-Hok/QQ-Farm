@@ -1,8 +1,7 @@
 package com.sustech.qqfarm.client;
 
 import com.sustech.qqfarm.common.*;
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
+import javafx.animation.*;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
@@ -14,6 +13,9 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.Text;
 import javafx.stage.Window;
 import javafx.util.Duration;
 
@@ -75,10 +77,14 @@ public class QqFarmController {
     private boolean farmStructureBuilt = false;
     private ImageView[][] cropViews = new ImageView[4][4];
     private Rectangle[][] selectionOverlays = new Rectangle[4][4];
+    private String[][] previousCropImages = new String[4][4]; // Track previous crop images
 
     // Character
     private ImageView characterView;
     private Timeline characterAnimation;
+
+    // Animation tracking
+    private int previousCoins = -1;
 
     @FXML
     public void initialize() {
@@ -147,8 +153,18 @@ public class QqFarmController {
     private void handleResponse(NetMessage msg) {
         if (msg.getMessage() != null) lblMessage.setText(msg.getMessage());
 
+        // Handle coin changes with animation
         if (msg.getUserCoins() != -1) {
-            lblCoins.setText("Coins: " + msg.getUserCoins());
+            int newCoins = msg.getUserCoins();
+
+            // Animate coin change
+            if (previousCoins != -1 && previousCoins != newCoins) {
+                int diff = newCoins - previousCoins;
+                animateCoinChange(diff);
+            }
+
+            lblCoins.setText("Coins: " + newCoins);
+            previousCoins = newCoins;
         }
 
         if (msg.getCommand() == Command.UPDATE) {
@@ -191,6 +207,61 @@ public class QqFarmController {
             isOwnerWatching = msg.isOwnerWatching();
             renderFarm(currentFarmState);
         }
+    }
+
+    private void animateCoinChange(int diff) {
+        // Create floating text to show coin change
+        Text coinChangeText = new Text((diff > 0 ? "+" : "") + diff);
+        coinChangeText.setFont(Font.font("System", FontWeight.BOLD, 14));
+        coinChangeText.setFill(diff > 0 ? Color.web("#27ae60") : Color.web("#e74c3c"));
+        coinChangeText.setStrokeWidth(1.5);
+
+        // Position near the coin label
+        StackPane parent = (StackPane) lblCoins.getParent();
+        parent.getChildren().add(coinChangeText);
+        coinChangeText.setTranslateY(0);
+        coinChangeText.setTranslateX(50);
+
+        // Create animation sequence
+        TranslateTransition translateTransition = new TranslateTransition(Duration.millis(1000), coinChangeText);
+        translateTransition.setByY(-40);
+
+        FadeTransition fadeTransition = new FadeTransition(Duration.millis(1000), coinChangeText);
+        fadeTransition.setFromValue(1.0);
+        fadeTransition.setToValue(0.0);
+
+        ScaleTransition scaleTransition = new ScaleTransition(Duration.millis(200), coinChangeText);
+        scaleTransition.setFromX(0.5);
+        scaleTransition.setFromY(0.5);
+        scaleTransition.setToX(1.2);
+        scaleTransition.setToY(1.2);
+
+        ParallelTransition parallelTransition = new ParallelTransition(translateTransition, fadeTransition);
+        SequentialTransition sequentialTransition = new SequentialTransition(scaleTransition, parallelTransition);
+
+        sequentialTransition.setOnFinished(e -> parent.getChildren().remove(coinChangeText));
+        sequentialTransition.play();
+    }
+
+    private void animateCropAppearance(ImageView cropView) {
+        // Fade in and scale animation for newly planted crops
+        cropView.setOpacity(0);
+        cropView.setScaleX(0.3);
+        cropView.setScaleY(0.3);
+
+        FadeTransition fadeTransition = new FadeTransition(Duration.millis(400), cropView);
+        fadeTransition.setFromValue(0.0);
+        fadeTransition.setToValue(1.0);
+
+        ScaleTransition scaleTransition = new ScaleTransition(Duration.millis(400), cropView);
+        scaleTransition.setFromX(0.3);
+        scaleTransition.setFromY(0.3);
+        scaleTransition.setToX(1.0);
+        scaleTransition.setToY(1.0);
+        scaleTransition.setInterpolator(Interpolator.EASE_OUT);
+
+        ParallelTransition parallelTransition = new ParallelTransition(fadeTransition, scaleTransition);
+        parallelTransition.play();
     }
 
     private void renderFarm(Farm farm) {
@@ -269,14 +340,31 @@ public class QqFarmController {
             farmStructureBuilt = true;
         }
 
-        // Update dynamic parts
+        // Update dynamic parts with animation
         for (int row = 0; row < 4; row++) {
             for (int col = 0; col < 4; col++) {
                 int index = row * 4 + col;
                 Plot p = farm.getPlots().get(index);
                 String cropImageName = getCropImageName(p, row);
                 Image cropImg = cropImageName != null ? loadAsset("crops/" + cropImageName) : null;
-                cropViews[row][col].setImage(cropImg);
+
+                ImageView cropView = cropViews[row][col];
+                String previousImage = previousCropImages[row][col];
+
+                // Detect if a new crop just appeared (transition from null/empty to first growing stage)
+                boolean isNewCrop = (previousImage == null || previousImage.isEmpty()) &&
+                        cropImageName != null &&
+                        cropImageName.contains("growing-0");
+
+                cropView.setImage(cropImg);
+
+                // Animate if it's a newly planted crop
+                if (isNewCrop && cropImg != null) {
+                    animateCropAppearance(cropView);
+                }
+
+                // Update tracking
+                previousCropImages[row][col] = cropImageName;
             }
         }
 
