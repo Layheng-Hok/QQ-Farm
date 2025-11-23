@@ -119,7 +119,11 @@ class ClientHandler implements Runnable {
                 if ("SUCCESS".equals(result)) {
                     res.setSuccess(true);
                     res.setMessage("You stole a crop! +12 Coins");
+                    // Update the victim's farm view (shows missing crop)
                     notifyFarmViewers(victim, new NetMessage(Command.UPDATE));
+                    // FIX: Update the thief's farm view (shows increased coins)
+                    // This ensures players looking at the thief see the coin update immediately.
+                    notifyFarmViewers(currentUser, new NetMessage(Command.UPDATE));
                 } else {
                     res.setSuccess(false);
                     res.setMessage(result);
