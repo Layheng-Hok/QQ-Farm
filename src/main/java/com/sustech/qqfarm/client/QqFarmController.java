@@ -5,6 +5,7 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
@@ -486,6 +487,53 @@ public class QqFarmController {
         waterView.setSmooth(false);
         waterView.setPreserveRatio(false);
         stack.getChildren().add(waterView);
+
+        // --- DEPTH EFFECT START ---
+        double shadowOpacity = 0.3;
+        double highlightOpacity = 0.3;
+        double effectSize = PLOT_SIZE * 0.2; // 20% of tile size
+
+        // 1. Bottom Shadow
+        if (gridRow == 9 && gridCol >= 1 && gridCol <= 8) {
+            Rectangle shadow = new Rectangle(PLOT_SIZE, effectSize, Color.rgb(0, 0, 0, shadowOpacity));
+            StackPane.setAlignment(shadow, Pos.TOP_CENTER);
+            stack.getChildren().add(shadow);
+        }
+
+        // 2. Right Shadow
+        if (gridCol == 9 && gridRow >= 1 && gridRow <= 8) {
+            Rectangle shadow = new Rectangle(effectSize, PLOT_SIZE, Color.rgb(0, 0, 0, shadowOpacity));
+            StackPane.setAlignment(shadow, Pos.CENTER_LEFT);
+            stack.getChildren().add(shadow);
+        }
+
+        // 3. Bottom-Right Corner Shadow (Row 9, Col 9)
+//        if (gridRow == 9 && gridCol == 9) {
+//            // Shadow on Top edge
+//            Rectangle topShadow = new Rectangle(PLOT_SIZE, effectSize, Color.rgb(0, 0, 0, shadowOpacity));
+//            StackPane.setAlignment(topShadow, Pos.TOP_CENTER);
+//
+//            // Shadow on Left edge
+//            Rectangle leftShadow = new Rectangle(effectSize, PLOT_SIZE - effectSize, Color.rgb(0, 0, 0, shadowOpacity));
+//            StackPane.setAlignment(leftShadow, Pos.BOTTOM_LEFT);
+//
+//            stack.getChildren().addAll(topShadow, leftShadow);
+//        }
+
+        // 4. Top Highlight
+        if (gridRow == 0 && gridCol >= 1 && gridCol <= 8) {
+            Rectangle highlight = new Rectangle(PLOT_SIZE, effectSize / 2, Color.rgb(255, 255, 255, highlightOpacity));
+            StackPane.setAlignment(highlight, Pos.BOTTOM_CENTER);
+            stack.getChildren().add(highlight);
+        }
+
+        // 5. Left Highlight
+        if (gridCol == 0 && gridRow >= 1 && gridRow <= 8) {
+            Rectangle highlight = new Rectangle(effectSize / 1.5, PLOT_SIZE, Color.rgb(255, 255, 255, highlightOpacity));
+            StackPane.setAlignment(highlight, Pos.CENTER_RIGHT);
+            stack.getChildren().add(highlight);
+        }
+        // --- DEPTH EFFECT END ---
 
         String overlay = null;
         if (gridRow == 9 && gridCol == 4) overlay = "path1.png";
