@@ -152,15 +152,25 @@ public class QqFarmController {
 
     private void handleResponse(NetMessage msg) {
         if (msg.getMessage() != null) lblMessage.setText(msg.getMessage());
+
+        // Update User's Coins (The viewer's coins)
         if (msg.getUserCoins() != -1) {
             int newCoins = msg.getUserCoins();
             if (previousCoins != -1 && previousCoins != newCoins) {
                 int diff = newCoins - previousCoins;
                 animateCoinChange(diff);
             }
-            lblCoins.setText("Coins: " + newCoins);
+
+            // Distinguish "My Coins" when visiting a friend
+            String coinLabel = "Coins: ";
+            if (currentViewUser != null && !currentViewUser.equals(myUsername)) {
+                coinLabel = "My Coins: ";
+            }
+            lblCoins.setText(coinLabel + newCoins);
+
             previousCoins = newCoins;
         }
+
         if (msg.getCommand() == Command.UPDATE) {
             Farm f = (Farm) msg.getData();
             if (f.getOwner().equals(currentViewUser)) {
@@ -170,6 +180,7 @@ public class QqFarmController {
             }
             return;
         }
+
         if (msg.getCommand() == Command.GET_PLAYERS) {
             if (msg.isSuccess()) {
                 @SuppressWarnings("unchecked")
@@ -194,6 +205,7 @@ public class QqFarmController {
             }
             return;
         }
+
         if (msg.getData() instanceof Farm) {
             currentFarmState = (Farm) msg.getData();
             isOwnerWatching = msg.isOwnerWatching();
@@ -244,9 +256,18 @@ public class QqFarmController {
     }
 
     private void renderFarm(Farm farm) {
-        lblUser.setText("Farm Owner: " + farm.getOwner());
+        // Show owner's coins if it is not my farm
         boolean isMyFarm = farm.getOwner().equals(myUsername);
+
+        if (isMyFarm) {
+            lblUser.setText("Farm Owner: " + farm.getOwner());
+        } else {
+            // Displays: "Farm Owner: player2, Coins: 40"
+            lblUser.setText("Farm Owner: " + farm.getOwner() + ", Coins: " + farm.getCoins());
+        }
+
         btnMyFarm.setText(isMyFarm ? "Friends" : "My Farm");
+
         if (!farmStructureBuilt) {
             gridFarm.getChildren().clear();
             for (int gridRow = 0; gridRow < 10; gridRow++) {
@@ -287,12 +308,12 @@ public class QqFarmController {
                             updateNotification();
                             e.consume();
                         });
-                        // MODIFIED: Update state and call updateSelections instead of setting color directly
+
                         pane.setOnMouseEntered(e -> {
                             hoveredPlotIndex = index;
                             updateSelections();
                         });
-                        // MODIFIED: Update state and call updateSelections instead of setting color directly
+
                         pane.setOnMouseExited(e -> {
                             hoveredPlotIndex = -1;
                             updateSelections();
