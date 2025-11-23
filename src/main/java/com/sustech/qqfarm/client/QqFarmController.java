@@ -296,8 +296,7 @@ public class QqFarmController {
         if (isMyFarm) {
             lblUser.setText("Farm Owner: " + farm.getOwner());
         } else {
-            // Displays: "Farm Owner: player2, Coins: 40"
-            lblUser.setText("Farm Owner: " + farm.getOwner() + ", Coins: " + farm.getCoins());
+            lblUser.setText("Farm Owner: " + farm.getOwner());
         }
 
         btnMyFarm.setText(isMyFarm ? "Friends" : "My Farm");
