@@ -88,7 +88,7 @@ class ClientHandler implements Runnable {
                 if ("SUCCESS".equals(pResult)) {
                     res.setSuccess(true);
                     res.setMessage("Planted successfully");
-                    broadcastUpdate(currentUser);
+                    notifyFarmViewers(currentUser, new NetMessage(Command.UPDATE));
                 } else {
                     res.setSuccess(false);
                     res.setMessage(pResult); // "Not enough coins..."
@@ -101,11 +101,11 @@ class ClientHandler implements Runnable {
                 if (hResult.equals("SUCCESS_HARVEST")) {
                     res.setSuccess(true);
                     res.setMessage("Harvested! +12 Coins");
-                    broadcastUpdate(currentUser);
+                    notifyFarmViewers(currentUser, new NetMessage(Command.UPDATE));
                 } else if (hResult.equals("SUCCESS_CLEAN")) {
                     res.setSuccess(true);
                     res.setMessage("Cleaned up stolen crop.");
-                    broadcastUpdate(currentUser);
+                    notifyFarmViewers(currentUser, new NetMessage(Command.UPDATE));
                 } else {
                     res.setSuccess(false);
                     res.setMessage("Not ripe yet");
@@ -119,7 +119,7 @@ class ClientHandler implements Runnable {
                 if ("SUCCESS".equals(result)) {
                     res.setSuccess(true);
                     res.setMessage("You stole a crop! +12 Coins");
-                    broadcastUpdate(victim);
+                    notifyFarmViewers(victim, new NetMessage(Command.UPDATE));
                 } else {
                     res.setSuccess(false);
                     res.setMessage(result);
@@ -155,12 +155,11 @@ class ClientHandler implements Runnable {
         }
     }
 
-    private void broadcastUpdate(String ownerName) {
-        NetMessage update = new NetMessage(Command.UPDATE);
+    private void notifyFarmViewers(String ownerName, NetMessage update) {
         update.setMessage("Farm Updated");
         update.setData(FarmManager.getInstance().getFarm(ownerName));
         String currentView = FarmManager.getInstance().playerViews.get(ownerName);
         update.setOwnerWatching(currentView != null && currentView.equals(ownerName));
-        GameServer.broadcast(update);
+        GameServer.notifyFarmViewers(ownerName, update);
     }
 }
