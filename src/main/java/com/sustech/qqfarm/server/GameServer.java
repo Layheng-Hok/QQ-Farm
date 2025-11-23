@@ -35,7 +35,7 @@ public class GameServer {
                 }
             }
         }, 1, 1, TimeUnit.SECONDS);
-        
+
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             ExecutorService pool = Executors.newCachedThreadPool();
             while (true) {

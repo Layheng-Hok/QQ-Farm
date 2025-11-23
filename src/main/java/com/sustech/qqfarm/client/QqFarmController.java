@@ -7,6 +7,7 @@ import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.control.*;
+import javafx.scene.effect.ColorAdjust;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
@@ -40,6 +41,8 @@ public class QqFarmController {
     private TextField txtFriendName;
     @FXML
     private Button btnMyFarm;
+    @FXML
+    private Button btnVisit;
     // Action Buttons
     @FXML
     private Button btnPlant;
@@ -76,6 +79,8 @@ public class QqFarmController {
     private Timeline characterAnimation;
     // Animation tracking
     private int previousCoins = -1;
+    // Disconnect flag
+    private boolean isSimulatedDisconnect = false;
 
     @FXML
     public void initialize() {
@@ -129,7 +134,7 @@ public class QqFarmController {
             out.flush();
             out.reset();
         } catch (IOException e) {
-            e.printStackTrace();
+            Platform.runLater(() -> lblMessage.setText("Failed to send " + cmd + ": No connection."));
         }
     }
 
@@ -147,11 +152,33 @@ public class QqFarmController {
                 }
             }
         } catch (Exception e) {
+            try {
+                if (socket != null) socket.close();
+            } catch (IOException ignored) {
+            }
             Platform.runLater(() -> {
-                lblMessage.setText("Disconnected from server.");
+                if (isSimulatedDisconnect) {
+                    lblMessage.setText("Simulated disconnect. UI remains responsive.");
+                } else {
+                    handleServerCrash();
+                }
                 updateConnectionButtons();
+                isSimulatedDisconnect = false;
             });
         }
+    }
+
+    private void handleServerCrash() {
+        lblMessage.setText("Server disconnected! Please reconnect.");
+        ColorAdjust grayscale = new ColorAdjust();
+        grayscale.setSaturation(-1);
+        gridFarm.setEffect(grayscale);
+        btnPlant.setDisable(true);
+        btnHarvest.setDisable(true);
+        btnSteal.setDisable(true);
+        btnMyFarm.setDisable(true);
+        btnVisit.setDisable(true);
+        txtFriendName.setDisable(true);
     }
 
     private void handleResponse(NetMessage msg) {
@@ -746,9 +773,9 @@ public class QqFarmController {
     @FXML
     public void onDisconnectClick() {
         if (socket != null && !socket.isClosed()) {
+            isSimulatedDisconnect = true;
             try {
                 socket.close();
-                lblMessage.setText("Simulated disconnect. UI remains responsive.");
                 updateConnectionButtons();
             } catch (IOException e) {
                 e.printStackTrace();
@@ -764,11 +791,19 @@ public class QqFarmController {
                 new Thread(this::listen).start();
                 send(Command.LOGIN, myUsername, null);
                 send(Command.GET_FARM, null, currentViewUser);
+                gridFarm.setEffect(null);
+                enableNavigation();
                 updateConnectionButtons();
             } else {
                 lblMessage.setText("Reconnection failed.");
             }
         }
+    }
+
+    private void enableNavigation() {
+        btnMyFarm.setDisable(false);
+        btnVisit.setDisable(false);
+        txtFriendName.setDisable(false);
     }
 
     private void updateConnectionButtons() {
