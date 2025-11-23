@@ -13,7 +13,7 @@ public class QqFarmApplication extends Application {
     @Override
     public void start(Stage stage) throws IOException {
         FXMLLoader fxmlLoader = new FXMLLoader(QqFarmApplication.class.getResource("/com/sustech/qqfarm/qq-farm-view.fxml"));
-        Scene scene = new Scene(fxmlLoader.load(), 480, 650);
+        Scene scene = new Scene(fxmlLoader.load(), 480, 690);
         scene.getStylesheets().add(Objects.requireNonNull(QqFarmApplication.class.getResource("/com/sustech/qqfarm/styles.css")).toExternalForm());
         stage.setTitle("QQ Farm Game");
         stage.setScene(scene);
@@ -26,5 +26,4 @@ public class QqFarmApplication extends Application {
     public static void main(String[] args) {
         launch();
     }
-
 }
