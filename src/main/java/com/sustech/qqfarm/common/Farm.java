@@ -29,6 +29,7 @@ public class Farm implements Serializable {
     public int getCoins() {
         return coins;
     }
+
     public void setCoins(int coins) {
         this.coins = coins;
     }

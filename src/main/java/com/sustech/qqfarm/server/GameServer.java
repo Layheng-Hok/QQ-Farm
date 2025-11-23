@@ -29,6 +29,7 @@ public class GameServer {
                     NetMessage updateMsg = new NetMessage(Command.UPDATE);
                     updateMsg.setMessage("Farm Updated");
                     updateMsg.setData(updatedFarm);
+                    updateMsg.setOwnerWatching(FarmManager.getInstance().playerViews.get(owner) != null && FarmManager.getInstance().playerViews.get(owner).equals(owner));
                     broadcast(updateMsg);
                 }
             }
@@ -60,4 +61,3 @@ public class GameServer {
     }
 
 }
-
