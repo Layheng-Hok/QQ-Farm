@@ -38,7 +38,7 @@
                 <HBox spacing="10">
                     <Button fx:id="btnMyFarm" text="My Farm" onAction="#onMyFarmClick"/>
                     <TextField fx:id="txtFriendName" promptText="Friend's Name" prefWidth="120"/>
-                    <Button text="Visit" onAction="#onVisitClick"/>
+                    <Button fx:id="btnVisit" text="Visit" onAction="#onVisitClick"/>
                 </HBox>
             </VBox>
             <Separator orientation="VERTICAL"/>
