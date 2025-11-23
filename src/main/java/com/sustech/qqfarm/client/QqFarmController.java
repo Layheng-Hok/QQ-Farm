@@ -405,7 +405,7 @@ public class QqFarmController {
         updateActionButtons();
     }
 
-    // MODIFIED: Handles Selected, Hovered, and Normal states in one place
+    // Handles Selected, Hovered, and Normal states in one place
     private void updateSelections() {
         for (int row = 0; row < 4; row++) {
             for (int col = 0; col < 4; col++) {

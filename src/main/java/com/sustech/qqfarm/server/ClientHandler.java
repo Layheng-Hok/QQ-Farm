@@ -80,14 +80,14 @@ class ClientHandler implements Runnable {
                     res.setMessage("Farm not found");
                 } else {
                     res.setData(f);
-                    // FIX: Added null check. If target is disconnected, they are not in playerViews.
+                    // Added null check. If target is disconnected, they are not in playerViews.
                     String viewer = fm.playerViews.get(target);
                     res.setOwnerWatching(viewer != null && viewer.equals(target));
                 }
                 break;
             case PLANT:
                 int pIdx = (Integer) req.getData();
-                // FIX: Handle String return for specific error
+                // Handle String return for specific error
                 String pResult = fm.plant(currentUser, pIdx);
                 if ("SUCCESS".equals(pResult)) {
                     res.setSuccess(true);
@@ -125,7 +125,7 @@ class ClientHandler implements Runnable {
                     res.setMessage("You stole a crop! +12 Coins");
                     // Update the victim's farm view (shows missing crop)
                     notifyFarmViewers(victim, new NetMessage(Command.UPDATE));
-                    // FIX: Update the thief's farm view (shows increased coins)
+                    // Update the thief's farm view (shows increased coins)
                     // This ensures players looking at the thief see the coin update immediately.
                     notifyFarmViewers(currentUser, new NetMessage(Command.UPDATE));
                 } else {
