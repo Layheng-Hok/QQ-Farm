@@ -26,7 +26,7 @@ public class FarmManager {
     public synchronized void saveData() {
         try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(DATA_FILE))) {
             oos.writeObject(new ConcurrentHashMap<>(farms));
-            System.out.println("[Server-Data] Game state saved to " + DATA_FILE);
+//            System.out.println("[Server-Data] Game state saved to " + DATA_FILE);
         } catch (IOException e) {
             e.printStackTrace();
         }
