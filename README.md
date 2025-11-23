@@ -64,6 +64,8 @@ The client is a JavaFX application that connects to the server.
 QQ-Farm follows a client-server architecture to support multiplayer features like visiting farms and stealing crops. The
 system is divided into three main packages: `server`, `client`, and `common`.
 
+![system-architecture.png](src/main/resources/com/sustech/qqfarm/assets/diagrams/system-architecture.png)
+
 ### Server Side (`com.sustech.qqfarm.server`)
 
 - **`GameServer.java`**: The entry point for the server. It listens for client connections on port 6969, uses a thread
@@ -121,6 +123,8 @@ instances of `NetMessage`, which includes:
 - **`targetUser`**: String for the target farm owner (e.g., for `STEAL` or `GET_FARM`).
 - **`userCoins`**: Integer for the requester's coin balance (always attached to responses).
 - **`ownerWatching`**: Boolean indicating if the farm owner is currently viewing their own farm.
+
+![protocol-sequence.png](src/main/resources/com/sustech/qqfarm/assets/diagrams/protocol-sequence.png)
 
 ### Message Flow
 
