@@ -8,14 +8,16 @@
             prefHeight="480.0" prefWidth="650.0">
     <top>
         <VBox spacing="10" alignment="CENTER" style="-fx-background-color: #ddd; -fx-padding: 10;">
-            <Label text="QQ Farm" textFill="#333">
+            <Label text="QQ Farm" textFill="#333" style="-fx-font-weight: bold">
                 <font>
                     <Font size="24.0"/>
                 </font>
             </Label>
             <HBox spacing="20" alignment="CENTER">
                 <Label fx:id="lblUser" text="Farm Owner: --" style="-fx-font-weight: bold;"/>
-                <Label fx:id="lblCoins" text="Coins: --" textFill="#d35400"/>
+                <StackPane>
+                    <Label fx:id="lblCoins" text="Coins: --" textFill="#d37e00"/>
+                </StackPane>
             </HBox>
             <Label fx:id="lblMessage" text="Ready" textFill="#555"/>
         </VBox>
