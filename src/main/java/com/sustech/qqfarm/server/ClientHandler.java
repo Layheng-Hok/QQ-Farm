@@ -24,6 +24,8 @@ class ClientHandler implements Runnable {
 
     @Override
     public void run() {
+        // [DEMO LOG] Verify server creates a new thread for this client
+        System.out.println("[Server-Worker] Handling client " + socket.getInetAddress() + " on thread: " + Thread.currentThread().getName());
         try {
             out = new ObjectOutputStream(socket.getOutputStream());
             in = new ObjectInputStream(socket.getInputStream());
@@ -31,6 +33,8 @@ class ClientHandler implements Runnable {
                 Object obj = in.readObject();
                 if (obj instanceof NetMessage) {
                     NetMessage request = (NetMessage) obj;
+                    // [DEMO LOG] Prove request processing happens on worker thread
+                    System.out.println("[Server-Worker] Processing " + request.getCommand() + " on: " + Thread.currentThread().getName());
                     NetMessage response = handleRequest(request);
                     if (response != null) {
                         send(response);

@@ -134,11 +134,15 @@ public class QqFarmController {
     }
 
     private void listen() {
+        // [DEMO LOG] Verify this is NOT the JavaFX Application Thread
+        System.out.println("[Client-Worker] Network Listener started on: " + Thread.currentThread().getName());
         try {
             while (true) {
                 Object obj = in.readObject();
                 if (obj instanceof NetMessage) {
                     NetMessage msg = (NetMessage) obj;
+                    // [DEMO LOG] Log when a message is received (still on worker thread)
+                    System.out.println("[Client-Worker] Message received on: " + Thread.currentThread().getName());
                     Platform.runLater(() -> handleResponse(msg));
                 }
             }
@@ -151,6 +155,9 @@ public class QqFarmController {
     }
 
     private void handleResponse(NetMessage msg) {
+        // [DEMO LOG] Verify we are back on the UI thread
+        System.out.println("[Client-UI] Updating GUI on: " + Thread.currentThread().getName());
+
         if (msg.getMessage() != null) lblMessage.setText(msg.getMessage());
 
         // Update User's Coins (The viewer's coins)
@@ -708,6 +715,8 @@ public class QqFarmController {
 
     @FXML
     public void onPlantClick() {
+        // [DEMO LOG] Verify button clicks are on UI thread
+        System.out.println("[Client-UI] Button Clicked on: " + Thread.currentThread().getName());
         if (selectedPlotIndex != -1) {
             send(Command.PLANT, selectedPlotIndex, null);
             deselectPlot();
@@ -716,6 +725,8 @@ public class QqFarmController {
 
     @FXML
     public void onHarvestClick() {
+        // [DEMO LOG] Verify button clicks are on UI thread
+        System.out.println("[Client-UI] Button Clicked on: " + Thread.currentThread().getName());
         if (selectedPlotIndex != -1) {
             send(Command.HARVEST, selectedPlotIndex, null);
             deselectPlot();
@@ -724,6 +735,8 @@ public class QqFarmController {
 
     @FXML
     public void onStealClick() {
+        // [DEMO LOG] Verify button clicks are on UI thread
+        System.out.println("[Client-UI] Button Clicked on: " + Thread.currentThread().getName());
         if (selectedPlotIndex != -1) {
             send(Command.STEAL, selectedPlotIndex, currentViewUser);
             deselectPlot();
