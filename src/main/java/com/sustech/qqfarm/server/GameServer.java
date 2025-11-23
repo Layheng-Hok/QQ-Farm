@@ -9,17 +9,15 @@ import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 public class GameServer {
-
     private static final int PORT = 6969;
-
     public static ConcurrentHashMap<String, ObjectOutputStream> onlineClients = new ConcurrentHashMap<>();
 
     public static void main(String[] args) {
         System.out.println("Starting QQ Farm Server on port " + PORT);
-
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
         scheduler.scheduleAtFixedRate(() -> {
             List<String> updatedOwners = FarmManager.getInstance().updateGrowthStates();
@@ -30,11 +28,10 @@ public class GameServer {
                     updateMsg.setMessage("Farm Updated");
                     updateMsg.setData(updatedFarm);
                     updateMsg.setOwnerWatching(FarmManager.getInstance().playerViews.get(owner) != null && FarmManager.getInstance().playerViews.get(owner).equals(owner));
-                    broadcast(updateMsg);
+                    notifyFarmViewers(owner, updateMsg);
                 }
             }
         }, 1, 1, TimeUnit.SECONDS);
-
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             ExecutorService pool = Executors.newCachedThreadPool();
             while (true) {
@@ -46,18 +43,23 @@ public class GameServer {
         }
     }
 
-    public static void broadcast(NetMessage msg) {
-        onlineClients.forEach((user, out) -> {
-            try {
-                synchronized (out) {
-                    out.writeObject(msg);
-                    out.flush();
-                    out.reset();
+    public static void notifyFarmViewers(String farmOwner, NetMessage msg) {
+        for (Map.Entry<String, String> entry : FarmManager.getInstance().playerViews.entrySet()) {
+            if (entry.getValue().equals(farmOwner)) {
+                String viewer = entry.getKey();
+                ObjectOutputStream out = onlineClients.get(viewer);
+                if (out != null) {
+                    try {
+                        synchronized (out) {
+                            out.writeObject(msg);
+                            out.flush();
+                            out.reset();
+                        }
+                    } catch (IOException e) {
+                        // Handle in thread
+                    }
                 }
-            } catch (IOException e) {
-                // Handle in thread
             }
-        });
+        }
     }
-
 }

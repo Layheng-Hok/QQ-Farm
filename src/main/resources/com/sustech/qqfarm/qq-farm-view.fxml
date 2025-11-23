@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.Font?>
@@ -20,6 +19,11 @@
                 </StackPane>
             </HBox>
             <Label fx:id="lblMessage" text="Ready" textFill="#555"/>
+            <HBox alignment="CENTER">
+                <Button fx:id="btnDisconnect" text="Disconnect" onAction="#onDisconnectClick"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button fx:id="btnReconnect" text="Reconnect" onAction="#onReconnectClick"/>
+            </HBox>
         </VBox>
     </top>
     <center>

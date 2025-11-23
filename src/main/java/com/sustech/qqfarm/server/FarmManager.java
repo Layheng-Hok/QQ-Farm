@@ -42,7 +42,7 @@ public class FarmManager {
             update.setMessage("View Update");
             update.setData(getFarm(viewer));
             update.setOwnerWatching(nowOnOwn);
-            GameServer.broadcast(update);
+            GameServer.notifyFarmViewers(viewer, update);
         }
     }
 
@@ -53,27 +53,23 @@ public class FarmManager {
             NetMessage update = new NetMessage(Command.UPDATE);
             update.setData(f);
             update.setOwnerWatching(false);
-            GameServer.broadcast(update);
+            GameServer.notifyFarmViewers(username, update);
         }
     }
 
     // --- ATOMIC OPERATIONS ---
-
     public String plant(String username, int plotIndex) {
         Farm farm = getFarm(username);
         if (farm == null) return "Farm not found.";
-
         synchronized (farm) {
             // Specific check for balance
             if (farm.getCoins() < 5) {
                 return "Not enough coins to plant (Need 5).";
             }
-
             Plot plot = farm.getPlots().get(plotIndex);
             if (plot.getState() != PlotState.EMPTY) {
                 return "Plot is not empty.";
             }
-
             farm.setCoins(farm.getCoins() - 5);
             plot.setState(PlotState.GROWING);
             plot.setPlantedTime(System.currentTimeMillis());
@@ -85,7 +81,6 @@ public class FarmManager {
     public String harvest(String username, int plotIndex) {
         Farm farm = getFarm(username);
         if (farm == null) return "FAIL";
-
         synchronized (farm) {
             Plot plot = farm.getPlots().get(plotIndex);
             if (plot.isReadyToHarvest()) {
@@ -94,11 +89,9 @@ public class FarmManager {
             boolean isRipe = plot.getState() == PlotState.RIPE;
             boolean isStolen = plot.getState() == PlotState.STOLEN;
             if (!isRipe && !isStolen) return "FAIL";
-
             if (isRipe) {
                 farm.setCoins(farm.getCoins() + 12);
             } // else if isStolen, +0
-
             plot.setState(PlotState.EMPTY);
             System.out.println("[LOG] " + username + " harvested plot " + plotIndex);
             checkAndResetHistory(farm);
@@ -108,16 +101,13 @@ public class FarmManager {
 
     public String steal(String thiefName, String victimName, int plotIndex) {
         if (thiefName.equals(victimName)) return "Cannot steal from yourself.";
-
         Farm victimFarm = getFarm(victimName);
         Farm thiefFarm = getFarm(thiefName);
         if (victimFarm == null || thiefFarm == null) return "Farm not found.";
-
         String victimCurrentView = playerViews.get(victimName);
         if (victimCurrentView != null && victimCurrentView.equals(victimName)) {
             return "Owner is watching! Stealing failed.";
         }
-
         synchronized (victimFarm) {
             long ripeCount = 0;
             for (Plot p : victimFarm.getPlots()) {
@@ -125,26 +115,20 @@ public class FarmManager {
                 if (p.getState() == PlotState.RIPE) ripeCount++;
             }
             if (ripeCount == 0) return "No ripe crops to steal.";
-
             int stolenByMe = victimFarm.getStealHistory().getOrDefault(thiefName, 0);
             long virtualTotal = ripeCount + stolenByMe;
             int maxAllowed = (int) (virtualTotal * 0.25);
             if (stolenByMe >= maxAllowed) {
                 return "You have reached the theft limit (25%) for this farm.";
             }
-
             if (plotIndex < 0 || plotIndex >= victimFarm.getPlots().size()) return "Invalid plot.";
-
             Plot targetPlot = victimFarm.getPlots().get(plotIndex);
             if (targetPlot.getState() != PlotState.RIPE) return "Selected plot is not ripe.";
-
             targetPlot.setState(PlotState.STOLEN);
             victimFarm.getStealHistory().put(thiefName, stolenByMe + 1);
-
             synchronized (thiefFarm) {
                 thiefFarm.setCoins(thiefFarm.getCoins() + 12);
             }
-
             System.out.println("[LOG] " + thiefName + " stole plot " + plotIndex + " from " + victimName);
             checkAndResetHistory(victimFarm);
             return "SUCCESS";
