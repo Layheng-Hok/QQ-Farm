@@ -67,6 +67,7 @@ public class QqFarmController {
     // State
     private Farm currentFarmState;
     private int selectedPlotIndex = -1;
+    private int hoveredPlotIndex = -1; // NEW: Track which plot is being hovered
     private boolean isOwnerWatching;
 
     // Asset Base Path
@@ -77,7 +78,8 @@ public class QqFarmController {
     private boolean farmStructureBuilt = false;
     private ImageView[][] cropViews = new ImageView[4][4];
     private Rectangle[][] selectionOverlays = new Rectangle[4][4];
-    private String[][] previousCropImages = new String[4][4]; // Track previous crop images
+    private StackPane[][] plotPanes = new StackPane[4][4]; // Keep reference to set cursors
+    private String[][] previousCropImages = new String[4][4];
 
     // Character
     private ImageView characterView;
@@ -90,6 +92,9 @@ public class QqFarmController {
     public void initialize() {
         connectDialog();
         new Thread(this::listen).start();
+
+        // Handle clicks on the background to deselect
+        gridFarm.setOnMouseClicked(e -> deselectPlot());
 
         Timeline timeline = new Timeline(new KeyFrame(Duration.seconds(1), ev -> {
             if (currentFarmState != null) {
@@ -153,16 +158,12 @@ public class QqFarmController {
     private void handleResponse(NetMessage msg) {
         if (msg.getMessage() != null) lblMessage.setText(msg.getMessage());
 
-        // Handle coin changes with animation
         if (msg.getUserCoins() != -1) {
             int newCoins = msg.getUserCoins();
-
-            // Animate coin change
             if (previousCoins != -1 && previousCoins != newCoins) {
                 int diff = newCoins - previousCoins;
                 animateCoinChange(diff);
             }
-
             lblCoins.setText("Coins: " + newCoins);
             previousCoins = newCoins;
         }
@@ -210,19 +211,16 @@ public class QqFarmController {
     }
 
     private void animateCoinChange(int diff) {
-        // Create floating text to show coin change
         Text coinChangeText = new Text((diff > 0 ? "+" : "") + diff);
         coinChangeText.setFont(Font.font("System", FontWeight.BOLD, 14));
         coinChangeText.setFill(diff > 0 ? Color.web("#27ae60") : Color.web("#e74c3c"));
         coinChangeText.setStrokeWidth(1.5);
 
-        // Position near the coin label
         StackPane parent = (StackPane) lblCoins.getParent();
         parent.getChildren().add(coinChangeText);
         coinChangeText.setTranslateY(0);
         coinChangeText.setTranslateX(50);
 
-        // Create animation sequence
         TranslateTransition translateTransition = new TranslateTransition(Duration.millis(1000), coinChangeText);
         translateTransition.setByY(-40);
 
@@ -244,7 +242,6 @@ public class QqFarmController {
     }
 
     private void animateCropAppearance(ImageView cropView) {
-        // Fade in and scale animation for newly planted crops
         cropView.setOpacity(0);
         cropView.setScaleX(0.3);
         cropView.setScaleY(0.3);
@@ -305,6 +302,7 @@ public class QqFarmController {
                         pane.setMinSize(PLOT_SIZE, PLOT_SIZE);
                         pane.setPrefSize(PLOT_SIZE, PLOT_SIZE);
                         pane.setMaxSize(PLOT_SIZE, PLOT_SIZE);
+                        plotPanes[row][col] = pane;
 
                         int index = row * 4 + col;
                         pane.setOnMouseClicked(e -> {
@@ -312,21 +310,19 @@ public class QqFarmController {
                             updateSelections();
                             updateActionButtons();
                             updateNotification();
+                            e.consume();
                         });
+
+                        // MODIFIED: Update state and call updateSelections instead of setting color directly
                         pane.setOnMouseEntered(e -> {
-                            if (selectedPlotIndex != index) {
-                                selOverlay.setFill(Color.rgb(255, 255, 255, 0.15));
-                                selOverlay.setStroke(Color.rgb(255, 255, 255, 0.5));
-                                selOverlay.setStrokeWidth(1);
-                                pane.setCursor(Cursor.HAND);
-                            }
+                            hoveredPlotIndex = index;
+                            updateSelections();
                         });
+
+                        // MODIFIED: Update state and call updateSelections instead of setting color directly
                         pane.setOnMouseExited(e -> {
-                            if (selectedPlotIndex != index) {
-                                selOverlay.setFill(Color.TRANSPARENT);
-                                selOverlay.setStroke(Color.TRANSPARENT);
-                                pane.setCursor(Cursor.DEFAULT);
-                            }
+                            hoveredPlotIndex = -1;
+                            updateSelections();
                         });
                     } else if (gridRow >= 1 && gridRow <= 8 && gridCol >= 1 && gridCol <= 8) {
                         // Grass
@@ -352,19 +348,16 @@ public class QqFarmController {
                 ImageView cropView = cropViews[row][col];
                 String previousImage = previousCropImages[row][col];
 
-                // Detect if a new crop just appeared (transition from null/empty to first growing stage)
                 boolean isNewCrop = (previousImage == null || previousImage.isEmpty()) &&
                         cropImageName != null &&
                         cropImageName.contains("growing-0");
 
                 cropView.setImage(cropImg);
 
-                // Animate if it's a newly planted crop
                 if (isNewCrop && cropImg != null) {
                     animateCropAppearance(cropView);
                 }
 
-                // Update tracking
                 previousCropImages[row][col] = cropImageName;
             }
         }
@@ -375,19 +368,38 @@ public class QqFarmController {
         handleCharacterAnimation();
     }
 
+    private void deselectPlot() {
+        selectedPlotIndex = -1;
+        updateSelections();
+        updateActionButtons();
+    }
+
+    // MODIFIED: Handles Selected, Hovered, and Normal states in one place
     private void updateSelections() {
         for (int row = 0; row < 4; row++) {
             for (int col = 0; col < 4; col++) {
                 int index = row * 4 + col;
                 Rectangle sel = selectionOverlays[row][col];
+                StackPane pane = plotPanes[row][col];
+
                 if (index == selectedPlotIndex) {
+                    // Selected State
                     sel.setFill(Color.rgb(255, 255, 255, 0.3));
                     sel.setStroke(Color.WHITE);
                     sel.setStrokeWidth(2);
+                    if (pane != null) pane.setCursor(Cursor.DEFAULT);
+                } else if (index == hoveredPlotIndex) {
+                    // Hovered State
+                    sel.setFill(Color.rgb(255, 255, 255, 0.15));
+                    sel.setStroke(Color.rgb(255, 255, 255, 0.5));
+                    sel.setStrokeWidth(1);
+                    if (pane != null) pane.setCursor(Cursor.HAND);
                 } else {
+                    // Normal State
                     sel.setFill(Color.TRANSPARENT);
                     sel.setStroke(Color.TRANSPARENT);
                     sel.setStrokeWidth(0);
+                    if (pane != null) pane.setCursor(Cursor.DEFAULT);
                 }
             }
         }
@@ -476,7 +488,6 @@ public class QqFarmController {
         grassView.setPreserveRatio(false);
         stack.getChildren().add(grassView);
 
-        // Overlay some with flower, stone, weed, or fence
         String overlay1 = null;
         String overlay2 = null;
 
@@ -578,39 +589,30 @@ public class QqFarmController {
         waterView.setPreserveRatio(false);
         stack.getChildren().add(waterView);
 
-        // --- DEPTH EFFECT START ---
         double shadowOpacity = 0.3;
         double highlightOpacity = 0.3;
         double effectSize = PLOT_SIZE * 0.2;
 
-        //  Bottom Shadow
         if (gridRow == 9 && gridCol >= 1 && gridCol <= 8) {
             Rectangle shadow = new Rectangle(PLOT_SIZE, effectSize, Color.rgb(0, 0, 0, shadowOpacity));
             StackPane.setAlignment(shadow, Pos.TOP_CENTER);
             stack.getChildren().add(shadow);
         }
-
-        //  Right Shadow
         if (gridCol == 9 && gridRow >= 1 && gridRow <= 8) {
             Rectangle shadow = new Rectangle(effectSize, PLOT_SIZE, Color.rgb(0, 0, 0, shadowOpacity));
             StackPane.setAlignment(shadow, Pos.CENTER_LEFT);
             stack.getChildren().add(shadow);
         }
-
-        //  Top Highlight
         if (gridRow == 0 && gridCol >= 1 && gridCol <= 8) {
             Rectangle highlight = new Rectangle(PLOT_SIZE, effectSize / 1.5, Color.rgb(255, 255, 255, highlightOpacity));
             StackPane.setAlignment(highlight, Pos.BOTTOM_CENTER);
             stack.getChildren().add(highlight);
         }
-
-        // Left Highlight
         if (gridCol == 0 && gridRow >= 1 && gridRow <= 8) {
             Rectangle highlight = new Rectangle(effectSize / 1.5, PLOT_SIZE, Color.rgb(255, 255, 255, highlightOpacity));
             StackPane.setAlignment(highlight, Pos.CENTER_RIGHT);
             stack.getChildren().add(highlight);
         }
-        // --- DEPTH EFFECT END ---
 
         String overlay = null;
         if (gridRow == 9 && gridCol == 4) overlay = "path1.png";
@@ -631,20 +633,15 @@ public class QqFarmController {
     }
 
     private String getPlotImageName(int row, int col) {
-        // Top Row (0)
         if (row == 0) {
             if (col == 0) return "top-left-plot.png";
             if (col == 3) return "top-right-plot.png";
             return "top-center-plot.png";
-        }
-        // Bottom Row (3)
-        else if (row == 3) {
+        } else if (row == 3) {
             if (col == 0) return "bottom-left-plot.png";
             if (col == 3) return "bottom-right-plot.png";
             return "bottom-center-plot.png";
-        }
-        // Middle Rows (1, 2)
-        else {
+        } else {
             if (col == 0) return "center-left-plot.png";
             if (col == 3) return "center-right-plot.png";
             return "center-center-plot.png";
@@ -652,25 +649,17 @@ public class QqFarmController {
     }
 
     private String getCropImageName(Plot p, int gridRow) {
-        // Image assets rely on 1-based row index (row1...row4)
         int imgRow = gridRow + 1;
-
         long elapsed = System.currentTimeMillis() - p.getPlantedTime();
         boolean isReadyTimeWise = elapsed >= Plot.GROW_TIME_MS;
 
-        // Check for STOLEN
         if (p.getState() == PlotState.STOLEN) {
             return "row" + imgRow + "-stolen.png";
         }
-
-        // Check for RIPE
         if (p.getState() == PlotState.RIPE || (p.getState() == PlotState.GROWING && isReadyTimeWise)) {
             return "row" + imgRow + "-ripe.png";
         }
-
-        // Check for GROWING stages
         if (p.getState() == PlotState.GROWING) {
-            // Total time is 6000ms. Half is 3000ms.
             boolean isHalfGrown = elapsed >= (Plot.GROW_TIME_MS / 2);
             if (isHalfGrown) {
                 return "row" + imgRow + "-growing-50.png";
@@ -678,7 +667,6 @@ public class QqFarmController {
                 return "row" + imgRow + "-growing-0.png";
             }
         }
-
         return null;
     }
 
@@ -723,7 +711,7 @@ public class QqFarmController {
             message = isMyFarm ? "Your crop was stolen, harvest to clean up!" : "This crop has been stolen.";
         } else if (state == PlotState.RIPE || (state == PlotState.GROWING && p.isReadyToHarvest())) {
             message = isMyFarm ? "Your crop is ripe, harvest your fruits!" : "Ripe crop, steal it!";
-        } else { // GROWING not ready
+        } else {
             message = isMyFarm ? "Your crop is growing, wait patiently!" : "Crop is growing, not ready yet.";
         }
 
@@ -755,6 +743,7 @@ public class QqFarmController {
     public void onPlantClick() {
         if (selectedPlotIndex != -1) {
             send(Command.PLANT, selectedPlotIndex, null);
+            deselectPlot();
         }
     }
 
@@ -762,6 +751,7 @@ public class QqFarmController {
     public void onHarvestClick() {
         if (selectedPlotIndex != -1) {
             send(Command.HARVEST, selectedPlotIndex, null);
+            deselectPlot();
         }
     }
 
@@ -769,6 +759,7 @@ public class QqFarmController {
     public void onStealClick() {
         if (selectedPlotIndex != -1) {
             send(Command.STEAL, selectedPlotIndex, currentViewUser);
+            deselectPlot();
         }
     }
 }
