@@ -491,43 +491,30 @@ public class QqFarmController {
         // --- DEPTH EFFECT START ---
         double shadowOpacity = 0.3;
         double highlightOpacity = 0.3;
-        double effectSize = PLOT_SIZE * 0.2; // 20% of tile size
+        double effectSize = PLOT_SIZE * 0.2;
 
-        // 1. Bottom Shadow
+        //  Bottom Shadow
         if (gridRow == 9 && gridCol >= 1 && gridCol <= 8) {
             Rectangle shadow = new Rectangle(PLOT_SIZE, effectSize, Color.rgb(0, 0, 0, shadowOpacity));
             StackPane.setAlignment(shadow, Pos.TOP_CENTER);
             stack.getChildren().add(shadow);
         }
 
-        // 2. Right Shadow
+        //  Right Shadow
         if (gridCol == 9 && gridRow >= 1 && gridRow <= 8) {
             Rectangle shadow = new Rectangle(effectSize, PLOT_SIZE, Color.rgb(0, 0, 0, shadowOpacity));
             StackPane.setAlignment(shadow, Pos.CENTER_LEFT);
             stack.getChildren().add(shadow);
         }
 
-        // 3. Bottom-Right Corner Shadow (Row 9, Col 9)
-//        if (gridRow == 9 && gridCol == 9) {
-//            // Shadow on Top edge
-//            Rectangle topShadow = new Rectangle(PLOT_SIZE, effectSize, Color.rgb(0, 0, 0, shadowOpacity));
-//            StackPane.setAlignment(topShadow, Pos.TOP_CENTER);
-//
-//            // Shadow on Left edge
-//            Rectangle leftShadow = new Rectangle(effectSize, PLOT_SIZE - effectSize, Color.rgb(0, 0, 0, shadowOpacity));
-//            StackPane.setAlignment(leftShadow, Pos.BOTTOM_LEFT);
-//
-//            stack.getChildren().addAll(topShadow, leftShadow);
-//        }
-
-        // 4. Top Highlight
+        //  Top Highlight
         if (gridRow == 0 && gridCol >= 1 && gridCol <= 8) {
-            Rectangle highlight = new Rectangle(PLOT_SIZE, effectSize / 2, Color.rgb(255, 255, 255, highlightOpacity));
+            Rectangle highlight = new Rectangle(PLOT_SIZE, effectSize / 1.5, Color.rgb(255, 255, 255, highlightOpacity));
             StackPane.setAlignment(highlight, Pos.BOTTOM_CENTER);
             stack.getChildren().add(highlight);
         }
 
-        // 5. Left Highlight
+        // Left Highlight
         if (gridCol == 0 && gridRow >= 1 && gridRow <= 8) {
             Rectangle highlight = new Rectangle(effectSize / 1.5, PLOT_SIZE, Color.rgb(255, 255, 255, highlightOpacity));
             StackPane.setAlignment(highlight, Pos.CENTER_RIGHT);
