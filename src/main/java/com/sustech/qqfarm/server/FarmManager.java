@@ -2,6 +2,7 @@ package com.sustech.qqfarm.server;
 
 import com.sustech.qqfarm.common.*;
 
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,8 @@ public class FarmManager {
     private final Map<String, Farm> farms = new ConcurrentHashMap<>();
     final Map<String, String> playerViews = new ConcurrentHashMap<>();
 
+    private static final String DATA_FILE = "data/farmdata.bin";
+
     private FarmManager() {
     }
 
@@ -20,8 +23,38 @@ public class FarmManager {
         return instance;
     }
 
+    public synchronized void saveData() {
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(DATA_FILE))) {
+            oos.writeObject(new ConcurrentHashMap<>(farms));
+            System.out.println("[Server-Data] Game state saved to " + DATA_FILE);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public synchronized void loadData() {
+        File file = new File(DATA_FILE);
+        if (!file.exists()) return;
+
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
+            Map<String, Farm> loaded = (Map<String, Farm>) ois.readObject();
+            farms.clear();
+            farms.putAll(loaded);
+            System.out.println("[Server-Data] Game state restored from " + DATA_FILE);
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("[Server-Data] Failed to load save file.");
+            e.printStackTrace();
+        }
+    }
+
     public synchronized Farm getOrCreateFarm(String username) {
-        return farms.computeIfAbsent(username, Farm::new);
+        Farm f = farms.computeIfAbsent(username, k -> {
+            Farm newFarm = new Farm(k);
+            saveData();
+            return newFarm;
+        });
+        return f;
     }
 
     public Farm getFarm(String username) {
@@ -74,6 +107,7 @@ public class FarmManager {
             plot.setState(PlotState.GROWING);
             plot.setPlantedTime(System.currentTimeMillis());
             System.out.println("[LOG] " + username + " planted on plot " + plotIndex);
+            saveData();
             return "SUCCESS";
         }
     }
@@ -95,6 +129,7 @@ public class FarmManager {
             plot.setState(PlotState.EMPTY);
             System.out.println("[LOG] " + username + " harvested plot " + plotIndex);
             checkAndResetHistory(farm);
+            saveData();
             return isRipe ? "SUCCESS_HARVEST" : "SUCCESS_CLEAN";
         }
     }
@@ -131,6 +166,7 @@ public class FarmManager {
             }
             System.out.println("[LOG] " + thiefName + " stole plot " + plotIndex + " from " + victimName);
             checkAndResetHistory(victimFarm);
+            saveData();
             return "SUCCESS";
         }
     }
@@ -162,6 +198,9 @@ public class FarmManager {
             }
             if (changed) changedFarms.add(farm.getOwner());
         });
+        if (!changedFarms.isEmpty()) {
+            saveData();
+        }
         return changedFarms;
     }
 }

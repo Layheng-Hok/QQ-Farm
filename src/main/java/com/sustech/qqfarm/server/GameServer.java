@@ -18,6 +18,9 @@ public class GameServer {
 
     public static void main(String[] args) {
         System.out.println("Starting QQ Farm Server on port " + PORT);
+
+        FarmManager.getInstance().loadData();
+
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
         scheduler.scheduleAtFixedRate(() -> {
             List<String> updatedOwners = FarmManager.getInstance().updateGrowthStates();
@@ -32,6 +35,7 @@ public class GameServer {
                 }
             }
         }, 1, 1, TimeUnit.SECONDS);
+        
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             ExecutorService pool = Executors.newCachedThreadPool();
             while (true) {
