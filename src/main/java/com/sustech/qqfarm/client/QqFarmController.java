@@ -180,6 +180,16 @@ public class QqFarmController {
         btnMyFarm.setDisable(true);
         btnVisit.setDisable(true);
         txtFriendName.setDisable(true);
+
+        for (int row = 0; row < 4; row++) {
+            for (int col = 0; col < 4; col++) {
+                StackPane pane = plotPanes[row][col];
+                if (pane != null) {
+                    pane.setDisable(true);
+                    pane.setCursor(Cursor.DEFAULT);
+                }
+            }
+        }
     }
 
     private void handleResponse(NetMessage msg) {
@@ -794,6 +804,16 @@ public class QqFarmController {
                 gridFarm.setEffect(null);
                 enableNavigation();
                 updateConnectionButtons();
+
+                for (int row = 0; row < 4; row++) {
+                    for (int col = 0; col < 4; col++) {
+                        StackPane pane = plotPanes[row][col];
+                        if (pane != null) {
+                            pane.setDisable(false);
+                            pane.setCursor(Cursor.DEFAULT);
+                        }
+                    }
+                }
             } else {
                 lblMessage.setText("Reconnection failed.");
             }
