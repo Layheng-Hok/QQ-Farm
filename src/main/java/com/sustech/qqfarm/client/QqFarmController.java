@@ -311,6 +311,7 @@ public class QqFarmController {
                             selectedPlotIndex = index;
                             updateSelections();
                             updateActionButtons();
+                            updateNotification();
                         });
                         pane.setOnMouseEntered(e -> {
                             if (selectedPlotIndex != index) {
@@ -370,6 +371,7 @@ public class QqFarmController {
 
         updateSelections();
         updateActionButtons();
+        updateNotification();
         handleCharacterAnimation();
     }
 
@@ -705,6 +707,27 @@ public class QqFarmController {
                 btnSteal.setDisable(false);
             }
         }
+    }
+
+    private void updateNotification() {
+        if (selectedPlotIndex == -1 || currentFarmState == null) return;
+
+        Plot p = currentFarmState.getPlots().get(selectedPlotIndex);
+        boolean isMyFarm = currentFarmState.getOwner().equals(myUsername);
+        PlotState state = p.getState();
+        String message;
+
+        if (state == PlotState.EMPTY) {
+            message = isMyFarm ? "Empty plot, plant your seed!" : "Empty plot.";
+        } else if (state == PlotState.STOLEN) {
+            message = isMyFarm ? "Your crop was stolen, harvest to clean up!" : "This crop has been stolen.";
+        } else if (state == PlotState.RIPE || (state == PlotState.GROWING && p.isReadyToHarvest())) {
+            message = isMyFarm ? "Your crop is ripe, harvest your fruits!" : "Ripe crop, steal it!";
+        } else { // GROWING not ready
+            message = isMyFarm ? "Your crop is growing, wait patiently!" : "Crop is growing, not ready yet.";
+        }
+
+        lblMessage.setText(message);
     }
 
     @FXML
