@@ -157,6 +157,7 @@ class ClientHandler implements Runnable {
         NetMessage update = new NetMessage(Command.UPDATE);
         update.setMessage("Farm Updated");
         update.setData(FarmManager.getInstance().getFarm(ownerName));
+        update.setOwnerWatching(FarmManager.getInstance().playerViews.get(ownerName) != null && FarmManager.getInstance().playerViews.get(ownerName).equals(ownerName));
         GameServer.broadcast(update);
     }
 }
