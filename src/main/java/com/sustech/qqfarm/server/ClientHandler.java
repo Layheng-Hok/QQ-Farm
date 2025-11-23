@@ -76,7 +76,9 @@ class ClientHandler implements Runnable {
                     res.setMessage("Farm not found");
                 } else {
                     res.setData(f);
-                    res.setOwnerWatching(fm.playerViews.get(target).equals(target));
+                    // FIX: Added null check. If target is disconnected, they are not in playerViews.
+                    String viewer = fm.playerViews.get(target);
+                    res.setOwnerWatching(viewer != null && viewer.equals(target));
                 }
                 break;
             case PLANT:
@@ -157,7 +159,8 @@ class ClientHandler implements Runnable {
         NetMessage update = new NetMessage(Command.UPDATE);
         update.setMessage("Farm Updated");
         update.setData(FarmManager.getInstance().getFarm(ownerName));
-        update.setOwnerWatching(FarmManager.getInstance().playerViews.get(ownerName) != null && FarmManager.getInstance().playerViews.get(ownerName).equals(ownerName));
+        String currentView = FarmManager.getInstance().playerViews.get(ownerName);
+        update.setOwnerWatching(currentView != null && currentView.equals(ownerName));
         GameServer.broadcast(update);
     }
 }
