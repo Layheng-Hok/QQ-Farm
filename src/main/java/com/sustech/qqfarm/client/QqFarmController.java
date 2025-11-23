@@ -169,6 +169,7 @@ public class QqFarmController {
     }
 
     private void handleServerCrash() {
+        deselectPlot();
         lblMessage.setText("Server disconnected! Please reconnect.");
         ColorAdjust grayscale = new ColorAdjust();
         grayscale.setSaturation(-1);
