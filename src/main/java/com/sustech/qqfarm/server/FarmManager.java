@@ -1,8 +1,6 @@
 package com.sustech.qqfarm.server;
 
-import com.sustech.qqfarm.common.Farm;
-import com.sustech.qqfarm.common.Plot;
-import com.sustech.qqfarm.common.PlotState;
+import com.sustech.qqfarm.common.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class FarmManager {
     private static final FarmManager instance = new FarmManager();
     private final Map<String, Farm> farms = new ConcurrentHashMap<>();
-    private final Map<String, String> playerViews = new ConcurrentHashMap<>();
+    final Map<String, String> playerViews = new ConcurrentHashMap<>();
 
     private FarmManager() {
     }
@@ -35,11 +33,28 @@ public class FarmManager {
     }
 
     public void updatePlayerView(String viewer, String farmOwner) {
+        String old = playerViews.get(viewer);
         playerViews.put(viewer, farmOwner);
+        boolean wasOnOwn = old != null && old.equals(viewer);
+        boolean nowOnOwn = farmOwner.equals(viewer);
+        if (wasOnOwn != nowOnOwn) {
+            NetMessage update = new NetMessage(Command.UPDATE);
+            update.setMessage("View Update");
+            update.setData(getFarm(viewer));
+            update.setOwnerWatching(nowOnOwn);
+            GameServer.broadcast(update);
+        }
     }
 
     public void removePlayer(String username) {
         playerViews.remove(username);
+        Farm f = getFarm(username);
+        if (f != null) {
+            NetMessage update = new NetMessage(Command.UPDATE);
+            update.setData(f);
+            update.setOwnerWatching(false);
+            GameServer.broadcast(update);
+        }
     }
 
     // --- ATOMIC OPERATIONS ---

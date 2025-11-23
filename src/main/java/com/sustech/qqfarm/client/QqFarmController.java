@@ -13,7 +13,6 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
-import javafx.scene.shape.StrokeType;
 import javafx.stage.Window;
 import javafx.util.Duration;
 
@@ -65,10 +64,20 @@ public class QqFarmController {
     // State
     private Farm currentFarmState;
     private int selectedPlotIndex = -1;
+    private boolean isOwnerWatching;
 
     // Asset Base Path
     private static final String ASSET_PATH = "/com/sustech/qqfarm/assets/";
     private static final int PLOT_SIZE = 48;
+
+    // Structure
+    private boolean farmStructureBuilt = false;
+    private ImageView[][] cropViews = new ImageView[4][4];
+    private Rectangle[][] selectionOverlays = new Rectangle[4][4];
+
+    // Character
+    private ImageView characterView;
+    private Timeline characterAnimation;
 
     @FXML
     public void initialize() {
@@ -145,6 +154,7 @@ public class QqFarmController {
             Farm f = (Farm) msg.getData();
             if (f.getOwner().equals(currentViewUser)) {
                 currentFarmState = f;
+                isOwnerWatching = msg.isOwnerWatching();
                 renderFarm(f);
             }
             return;
@@ -177,6 +187,7 @@ public class QqFarmController {
 
         if (msg.getData() instanceof Farm) {
             currentFarmState = (Farm) msg.getData();
+            isOwnerWatching = msg.isOwnerWatching();
             renderFarm(currentFarmState);
         }
     }
@@ -187,29 +198,175 @@ public class QqFarmController {
         boolean isMyFarm = farm.getOwner().equals(myUsername);
         btnMyFarm.setText(isMyFarm ? "Friends" : "My Farm");
 
-        gridFarm.getChildren().clear();
+        if (!farmStructureBuilt) {
+            gridFarm.getChildren().clear();
 
-        for (int gridRow = 0; gridRow < 10; gridRow++) {
-            for (int gridCol = 0; gridCol < 10; gridCol++) {
-                if (gridRow >= 3 && gridRow <= 6 && gridCol >= 3 && gridCol <= 6) {
-                    // Render plot
-                    int plotIndex = (gridRow - 3) * 4 + (gridCol - 3);
-                    Plot p = farm.getPlots().get(plotIndex);
-                    StackPane plotPane = createPlotView(p, plotIndex);
-                    gridFarm.add(plotPane, gridCol, gridRow);
-                } else if (gridRow >= 1 && gridRow <= 8 && gridCol >= 1 && gridCol <= 8) {
-                    // Render surrounding grass block (shifted by +1)
-                    StackPane grassPane = createGrassBlock(gridRow - 1, gridCol - 1);
-                    gridFarm.add(grassPane, gridCol, gridRow);
-                } else {
-                    // Render outer water tile
-                    StackPane waterPane = createWaterBlock(gridRow, gridCol);
-                    gridFarm.add(waterPane, gridCol, gridRow);
+            for (int gridRow = 0; gridRow < 10; gridRow++) {
+                for (int gridCol = 0; gridCol < 10; gridCol++) {
+                    StackPane pane;
+                    if (gridRow >= 3 && gridRow <= 6 && gridCol >= 3 && gridCol <= 6) {
+                        // Plot
+                        int row = gridRow - 3;
+                        int col = gridCol - 3;
+                        String plotImageName = getPlotImageName(row, col);
+                        Image bgImg = loadAsset("plots/" + plotImageName);
+                        ImageView bgView = new ImageView(bgImg);
+                        bgView.setFitWidth(PLOT_SIZE);
+                        bgView.setFitHeight(PLOT_SIZE);
+                        bgView.setSmooth(false);
+                        bgView.setPreserveRatio(false);
+
+                        ImageView cropView = new ImageView();
+                        cropView.setFitWidth(PLOT_SIZE * 0.5);
+                        cropView.setFitHeight(PLOT_SIZE * 0.5);
+                        cropView.setSmooth(false);
+                        cropView.setPreserveRatio(false);
+                        cropViews[row][col] = cropView;
+
+                        Rectangle selOverlay = new Rectangle(PLOT_SIZE, PLOT_SIZE);
+                        selOverlay.setMouseTransparent(true);
+                        selOverlay.setFill(Color.TRANSPARENT);
+                        selOverlay.setStroke(Color.TRANSPARENT);
+                        selectionOverlays[row][col] = selOverlay;
+
+                        pane = new StackPane(bgView, cropView, selOverlay);
+                        pane.setMinSize(PLOT_SIZE, PLOT_SIZE);
+                        pane.setPrefSize(PLOT_SIZE, PLOT_SIZE);
+                        pane.setMaxSize(PLOT_SIZE, PLOT_SIZE);
+
+                        int index = row * 4 + col;
+                        pane.setOnMouseClicked(e -> {
+                            selectedPlotIndex = index;
+                            updateSelections();
+                            updateActionButtons();
+                        });
+                        pane.setOnMouseEntered(e -> {
+                            if (selectedPlotIndex != index) {
+                                selOverlay.setFill(Color.rgb(255, 255, 255, 0.15));
+                                selOverlay.setStroke(Color.rgb(255, 255, 255, 0.5));
+                                selOverlay.setStrokeWidth(1);
+                                pane.setCursor(Cursor.HAND);
+                            }
+                        });
+                        pane.setOnMouseExited(e -> {
+                            if (selectedPlotIndex != index) {
+                                selOverlay.setFill(Color.TRANSPARENT);
+                                selOverlay.setStroke(Color.TRANSPARENT);
+                                pane.setCursor(Cursor.DEFAULT);
+                            }
+                        });
+                    } else if (gridRow >= 1 && gridRow <= 8 && gridCol >= 1 && gridCol <= 8) {
+                        // Grass
+                        pane = createGrassBlock(gridRow - 1, gridCol - 1);
+                    } else {
+                        // Water
+                        pane = createWaterBlock(gridRow, gridCol);
+                    }
+                    gridFarm.add(pane, gridCol, gridRow);
                 }
+            }
+            farmStructureBuilt = true;
+        }
+
+        // Update dynamic parts
+        for (int row = 0; row < 4; row++) {
+            for (int col = 0; col < 4; col++) {
+                int index = row * 4 + col;
+                Plot p = farm.getPlots().get(index);
+                String cropImageName = getCropImageName(p, row);
+                Image cropImg = cropImageName != null ? loadAsset("crops/" + cropImageName) : null;
+                cropViews[row][col].setImage(cropImg);
             }
         }
 
+        updateSelections();
         updateActionButtons();
+        handleCharacterAnimation();
+    }
+
+    private void updateSelections() {
+        for (int row = 0; row < 4; row++) {
+            for (int col = 0; col < 4; col++) {
+                int index = row * 4 + col;
+                Rectangle sel = selectionOverlays[row][col];
+                if (index == selectedPlotIndex) {
+                    sel.setFill(Color.rgb(255, 255, 255, 0.3));
+                    sel.setStroke(Color.WHITE);
+                    sel.setStrokeWidth(2);
+                } else {
+                    sel.setFill(Color.TRANSPARENT);
+                    sel.setStroke(Color.TRANSPARENT);
+                    sel.setStrokeWidth(0);
+                }
+            }
+        }
+    }
+
+    private void handleCharacterAnimation() {
+        boolean isMyFarm = currentFarmState.getOwner().equals(myUsername);
+        if (!isMyFarm && isOwnerWatching) {
+            if (characterView == null) {
+                characterView = new ImageView();
+                characterView.setFitWidth(PLOT_SIZE);
+                characterView.setFitHeight(PLOT_SIZE);
+                characterView.setSmooth(false);
+                characterView.setPreserveRatio(false);
+                characterView.setImage(loadAsset("characters/farmer1.png"));
+                gridFarm.add(characterView, 7, 6);
+            }
+            if (characterAnimation == null) {
+                startCharacterAnimation();
+            }
+        } else {
+            if (characterView != null) {
+                gridFarm.getChildren().remove(characterView);
+                characterView = null;
+            }
+            if (characterAnimation != null) {
+                characterAnimation.stop();
+                characterAnimation = null;
+            }
+        }
+    }
+
+    private void startCharacterAnimation() {
+        String[] sequence = {
+                "characters/farmer1.png",
+                "characters/farmer2.png",
+                "characters/farmer1.png",
+                "characters/farmer2.png",
+                "characters/farmer1.png",
+                "characters/farmer2.png",
+                "characters/farmer3.png",
+                "characters/farmer4.png",
+                "characters/farmer3.png",
+                "characters/farmer4.png",
+                "characters/farmer3.png",
+                "characters/farmer4.png"
+        };
+
+        characterAnimation = new Timeline();
+        characterAnimation.setCycleCount(Timeline.INDEFINITE);
+        int i = 0;
+        for (String path : sequence) {
+            final Image img = loadAsset(path);
+            KeyFrame kf = new KeyFrame(Duration.seconds(0.7 * i), event -> characterView.setImage(img));
+            characterAnimation.getKeyFrames().add(kf);
+            i++;
+        }
+        characterAnimation.play();
+    }
+
+    private Image loadAsset(String relativePath) {
+        try {
+            InputStream is = getClass().getResourceAsStream(ASSET_PATH + relativePath);
+            if (is != null) {
+                return new Image(is);
+            }
+        } catch (Exception e) {
+            System.err.println("Could not load asset: " + relativePath);
+        }
+        return null;
     }
 
     private StackPane createGrassBlock(int gridRow, int gridCol) {
@@ -218,7 +375,11 @@ public class QqFarmController {
         stack.setPrefSize(PLOT_SIZE, PLOT_SIZE);
         stack.setMaxSize(PLOT_SIZE, PLOT_SIZE);
 
-        ImageView grassView = loadImageView("tiles/grass.png", PLOT_SIZE);
+        ImageView grassView = new ImageView(loadAsset("tiles/grass.png"));
+        grassView.setFitWidth(PLOT_SIZE);
+        grassView.setFitHeight(PLOT_SIZE);
+        grassView.setSmooth(false);
+        grassView.setPreserveRatio(false);
         stack.getChildren().add(grassView);
 
         // Overlay some with flower, stone, weed, or fence
@@ -291,11 +452,19 @@ public class QqFarmController {
         else if (gridRow == 7 && gridCol == 7) overlay2 = "front-right-fence.png";
 
         if (overlay1 != null) {
-            ImageView overlayView = loadImageView("decorations/" + overlay1, PLOT_SIZE * 0.8);
+            ImageView overlayView = new ImageView(loadAsset("decorations/" + overlay1));
+            overlayView.setFitWidth(PLOT_SIZE * 0.8);
+            overlayView.setFitHeight(PLOT_SIZE * 0.8);
+            overlayView.setSmooth(false);
+            overlayView.setPreserveRatio(false);
             stack.getChildren().add(overlayView);
         }
         if (overlay2 != null) {
-            ImageView overlayView = loadImageView("fences/" + overlay2, PLOT_SIZE);
+            ImageView overlayView = new ImageView(loadAsset("fences/" + overlay2));
+            overlayView.setFitWidth(PLOT_SIZE);
+            overlayView.setFitHeight(PLOT_SIZE);
+            overlayView.setSmooth(false);
+            overlayView.setPreserveRatio(false);
             stack.getChildren().add(overlayView);
         }
 
@@ -308,7 +477,11 @@ public class QqFarmController {
         stack.setPrefSize(PLOT_SIZE, PLOT_SIZE);
         stack.setMaxSize(PLOT_SIZE, PLOT_SIZE);
 
-        ImageView waterView = loadImageView("tiles/water.png", PLOT_SIZE);
+        ImageView waterView = new ImageView(loadAsset("tiles/water.png"));
+        waterView.setFitWidth(PLOT_SIZE);
+        waterView.setFitHeight(PLOT_SIZE);
+        waterView.setSmooth(false);
+        waterView.setPreserveRatio(false);
         stack.getChildren().add(waterView);
 
         String overlay = null;
@@ -318,111 +491,15 @@ public class QqFarmController {
         else if (gridRow == 3 && gridCol == 0) overlay = "rock.png";
 
         if (overlay != null) {
-            ImageView overlayView = loadImageView("decorations/" + overlay, PLOT_SIZE * 0.8);
+            ImageView overlayView = new ImageView(loadAsset("decorations/" + overlay));
+            overlayView.setFitWidth(PLOT_SIZE * 0.8);
+            overlayView.setFitHeight(PLOT_SIZE * 0.8);
+            overlayView.setSmooth(false);
+            overlayView.setPreserveRatio(false);
             stack.getChildren().add(overlayView);
         }
 
         return stack;
-    }
-
-    /**
-     * Creates the visual representation of a plot using images.
-     */
-    private StackPane createPlotView(Plot p, int index) {
-        StackPane stack = new StackPane();
-        stack.setMinSize(PLOT_SIZE, PLOT_SIZE);
-        stack.setPrefSize(PLOT_SIZE, PLOT_SIZE);
-        stack.setMaxSize(PLOT_SIZE, PLOT_SIZE);
-
-        int row = index / 4; // 0-3
-        int col = index % 4; // 0-3
-
-        // 1. Determine Background Plot Image (100% Size)
-        String plotImageName = getPlotImageName(row, col);
-        ImageView bgView = loadImageView("plots/" + plotImageName, PLOT_SIZE);
-
-        // 2. Determine Crop Overlay Image
-        ImageView cropView = null;
-        if (p.getState() != PlotState.EMPTY) {
-            String cropImageName = getCropImageName(p, row);
-            if (cropImageName != null) {
-                cropView = loadImageView("crops/" + cropImageName, PLOT_SIZE * 0.5);
-            }
-        }
-
-        // 3. Selection/Hover Indicator Overlay
-        Rectangle selectionOverlay = new Rectangle(PLOT_SIZE, PLOT_SIZE);
-        selectionOverlay.setMouseTransparent(true); // Important: Let clicks pass through to the StackPane
-        selectionOverlay.setStrokeType(StrokeType.INSIDE);
-        if (index == selectedPlotIndex) {
-            // "Selected" effect: Strong highlight
-            selectionOverlay.setFill(Color.rgb(255, 255, 255, 0.3));
-            selectionOverlay.setStroke(Color.WHITE);
-            selectionOverlay.setStrokeWidth(2);
-        } else {
-            // Default: Invisible
-            selectionOverlay.setFill(Color.TRANSPARENT);
-            selectionOverlay.setStroke(Color.TRANSPARENT);
-        }
-
-        // Add layers to stack (StackPane automatically centers children)
-        stack.getChildren().add(bgView);
-        if (cropView != null) {
-            stack.getChildren().add(cropView);
-        }
-        stack.getChildren().add(selectionOverlay);
-
-        // --- Event Handlers ---
-        // Click: Select the plot
-        stack.setOnMouseClicked(e -> {
-            selectedPlotIndex = index;
-            renderFarm(currentFarmState); // Re-render to update selection visuals
-        });
-
-        // Hover Enter: Show faint highlight if NOT selected
-        stack.setOnMouseEntered(e -> {
-            if (index != selectedPlotIndex) {
-                selectionOverlay.setFill(Color.rgb(255, 255, 255, 0.15)); // Faint white
-                selectionOverlay.setStroke(Color.rgb(255, 255, 255, 0.5)); // Faint border
-                selectionOverlay.setStrokeWidth(1);
-                stack.setCursor(Cursor.HAND); // Change cursor to hand
-            }
-        });
-
-        // Hover Exit: Remove highlight if NOT selected
-        stack.setOnMouseExited(e -> {
-            if (index != selectedPlotIndex) {
-                selectionOverlay.setFill(Color.TRANSPARENT);
-                selectionOverlay.setStroke(Color.TRANSPARENT);
-                stack.setCursor(Cursor.DEFAULT);
-            }
-        });
-
-        return stack;
-    }
-
-    /**
-     * Helper to load image resource and scale it for display.
-     * Now accepts a specific size to allow for crop scaling.
-     */
-    private ImageView loadImageView(String relativePath, double size) {
-        try {
-            InputStream is = getClass().getResourceAsStream(ASSET_PATH + relativePath);
-            if (is != null) {
-                Image img = new Image(is);
-                ImageView iv = new ImageView(img);
-                // Updated scaling to passed size
-                iv.setFitWidth(size);
-                iv.setFitHeight(size);
-                // Keep smooth false for crisp pixels
-                iv.setSmooth(false);
-                iv.setPreserveRatio(false);
-                return iv;
-            }
-        } catch (Exception e) {
-            System.err.println("Could not load image: " + relativePath);
-        }
-        return new ImageView();
     }
 
     private String getPlotImageName(int row, int col) {
@@ -545,5 +622,4 @@ public class QqFarmController {
             send(Command.STEAL, selectedPlotIndex, currentViewUser);
         }
     }
-
 }

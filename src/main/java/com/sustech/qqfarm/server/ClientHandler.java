@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 class ClientHandler implements Runnable {
-
     private Socket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
@@ -28,7 +27,6 @@ class ClientHandler implements Runnable {
         try {
             out = new ObjectOutputStream(socket.getOutputStream());
             in = new ObjectInputStream(socket.getInputStream());
-
             while (true) {
                 Object obj = in.readObject();
                 if (obj instanceof NetMessage) {
@@ -59,7 +57,6 @@ class ClientHandler implements Runnable {
         FarmManager fm = FarmManager.getInstance();
         NetMessage res = new NetMessage(req.getCommand());
         res.setSuccess(true);
-
         switch (req.getCommand()) {
             case LOGIN:
                 currentUser = (String) req.getData();
@@ -68,8 +65,8 @@ class ClientHandler implements Runnable {
                 fm.updatePlayerView(currentUser, currentUser);
                 res.setMessage("Logged in as " + currentUser);
                 res.setData(fm.getFarm(currentUser));
+                res.setOwnerWatching(true);
                 break;
-
             case GET_FARM:
                 String target = req.getTargetUser() != null ? req.getTargetUser() : currentUser;
                 fm.updatePlayerView(currentUser, target);
@@ -79,9 +76,9 @@ class ClientHandler implements Runnable {
                     res.setMessage("Farm not found");
                 } else {
                     res.setData(f);
+                    res.setOwnerWatching(fm.playerViews.get(target).equals(target));
                 }
                 break;
-
             case PLANT:
                 int pIdx = (Integer) req.getData();
                 // FIX: Handle String return for specific error
@@ -96,7 +93,6 @@ class ClientHandler implements Runnable {
                 }
                 res.setData(fm.getFarm(currentUser));
                 break;
-
             case HARVEST:
                 int hIdx = (Integer) req.getData();
                 String hResult = String.valueOf(fm.harvest(currentUser, hIdx));
@@ -114,7 +110,6 @@ class ClientHandler implements Runnable {
                 }
                 res.setData(fm.getFarm(currentUser));
                 break;
-
             case STEAL:
                 String victim = req.getTargetUser();
                 int sIdx = (Integer) req.getData();
@@ -129,15 +124,14 @@ class ClientHandler implements Runnable {
                 }
                 // Return victim's farm to update view
                 res.setData(fm.getFarm(victim));
+                res.setOwnerWatching(fm.playerViews.getOrDefault(victim, "").equals(victim));
                 break;
-
             case GET_PLAYERS:
                 List<String> players = new ArrayList<>(fm.getAllPlayers());
                 players.remove(currentUser);
                 res.setData(players);
                 break;
         }
-
         // Always attach the current user's coin balance to the response
         // This ensures the UI shows MY coins even when looking at OTHER farms.
         if (currentUser != null) {
@@ -146,7 +140,6 @@ class ClientHandler implements Runnable {
                 res.setUserCoins(myFarm.getCoins());
             }
         }
-
         return res;
     }
 
