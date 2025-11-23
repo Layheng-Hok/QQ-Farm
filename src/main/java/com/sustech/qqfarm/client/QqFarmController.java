@@ -337,12 +337,15 @@ public class QqFarmController {
                 "characters/farmer2.png",
                 "characters/farmer1.png",
                 "characters/farmer2.png",
+                "characters/farmer1.png",
                 "characters/farmer3.png",
                 "characters/farmer4.png",
                 "characters/farmer3.png",
                 "characters/farmer4.png",
                 "characters/farmer3.png",
-                "characters/farmer4.png"
+                "characters/farmer4.png",
+                "characters/farmer3.png",
+                "characters/farmer3.png"
         };
 
         characterAnimation = new Timeline();
