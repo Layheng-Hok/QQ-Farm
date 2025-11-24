@@ -24,6 +24,12 @@ public class GameServer {
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
         scheduler.scheduleAtFixedRate(() -> {
             List<String> updatedOwners = FarmManager.getInstance().updateGrowthStates();
+
+            // [DEMO LOG] Log activities of the scheduler
+//            System.out.println("[Scheduler] Tick @ " + System.currentTimeMillis() +
+//                    " | Updated farms: " + updatedOwners.size() +
+//                    " | Thread: " + Thread.currentThread().getName());
+
             if (!updatedOwners.isEmpty()) {
                 for (String owner : updatedOwners) {
                     Farm updatedFarm = FarmManager.getInstance().getFarm(owner);
