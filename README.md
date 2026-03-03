@@ -4,6 +4,10 @@ QQ-Farm is a simple multiplayer farming game inspired by classic social games. P
 coins, visit friends' farms, and steal ripe crops under certain conditions. The game uses a client-server architecture
 with JavaFX for the graphical user interface and socket-based communication for multiplayer interactions.
 
+## 📺 Preview
+
+https://github.com/user-attachments/assets/41d32c6b-b55a-41f3-b1c9-2f7b0e975281
+
 ## 🏗️ Architecture
 
 QQ-Farm follows a client-server architecture to support multiplayer features like visiting farms and stealing crops. The
