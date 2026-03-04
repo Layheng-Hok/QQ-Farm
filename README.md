@@ -1,4 +1,4 @@
-# 🌾 QQ-Farm
+# 🌾 QQ Farm
 
 QQ-Farm is a simple multiplayer farming game inspired by classic social games. Players can plant crops, harvest them for
 coins, visit friends' farms, and steal ripe crops under certain conditions. The game uses a client-server architecture
